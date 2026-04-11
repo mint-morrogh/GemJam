@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges">
+  <!-- Multi-Merge: Gold arrows converging on purple badge -->
+  <g id="outline">
+    <rect x="1" y="1" width="14" height="14" fill="none" stroke="#4A4A5A" stroke-width="1"/>
+  </g>
+  <g id="base">
+    <!-- Badge fill -->
+    <rect x="2" y="2" width="12" height="12" fill="#5B1B8B"/>
+    <!-- Top arrow pointing down -->
+    <rect x="7" y="3" width="2" height="1" fill="#FFD52D"/>
+    <rect x="6" y="4" width="4" height="1" fill="#FFD52D"/>
+    <rect x="7" y="5" width="2" height="1" fill="#E8B83F"/>
+    <!-- Left arrow pointing right -->
+    <rect x="3" y="7" width="1" height="2" fill="#FFD52D"/>
+    <rect x="4" y="6" width="1" height="4" fill="#FFD52D"/>
+    <rect x="5" y="7" width="1" height="2" fill="#E8B83F"/>
+    <!-- Right arrow pointing left -->
+    <rect x="12" y="7" width="1" height="2" fill="#FFD52D"/>
+    <rect x="11" y="6" width="1" height="4" fill="#FFD52D"/>
+    <rect x="10" y="7" width="1" height="2" fill="#E8B83F"/>
+    <!-- Bottom arrow pointing up -->
+    <rect x="7" y="12" width="2" height="1" fill="#E8B83F"/>
+    <rect x="6" y="11" width="4" height="1" fill="#FFD52D"/>
+    <rect x="7" y="10" width="2" height="1" fill="#FFD52D"/>
+    <!-- Center merge point -->
+    <rect x="7" y="7" width="2" height="2" fill="#FFFFFF"/>
+  </g>
+  <g id="highlight">
+    <rect x="7" y="3" width="1" height="1" fill="#FFFFFF"/>
+    <rect x="3" y="7" width="1" height="1" fill="#FFFFFF"/>
+  </g>
+</svg>

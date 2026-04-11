@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 16" shape-rendering="crispEdges">
+  <!-- Pressed button: Darker with inset shadow -->
+  <g id="outline">
+    <rect x="0" y="0" width="48" height="16" fill="#0A0A14"/>
+  </g>
+  <g id="base">
+    <!-- Main fill (darker) -->
+    <rect x="1" y="1" width="46" height="14" fill="#2A2A3A"/>
+    <!-- Top inset shadow (dark) -->
+    <rect x="1" y="1" width="46" height="1" fill="#1A1A2A"/>
+    <!-- Left inset shadow (dark) -->
+    <rect x="1" y="1" width="1" height="14" fill="#1A1A2A"/>
+    <!-- Bottom edge (lighter — inverted bevel) -->
+    <rect x="1" y="14" width="46" height="1" fill="#3A3A4A"/>
+    <!-- Right edge (lighter — inverted bevel) -->
+    <rect x="46" y="1" width="1" height="14" fill="#3A3A4A"/>
+  </g>
+</svg>

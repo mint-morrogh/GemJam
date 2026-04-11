@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges">
+  <!-- Gem Magnet: Cyan magnet on dark badge -->
+  <g id="outline">
+    <rect x="1" y="1" width="14" height="14" fill="none" stroke="#4A4A5A" stroke-width="1"/>
+  </g>
+  <g id="base">
+    <!-- Badge fill -->
+    <rect x="2" y="2" width="12" height="12" fill="#1B2B3B"/>
+    <!-- Magnet U-shape - left arm -->
+    <rect x="4" y="4" width="2" height="1" fill="#E83F5B"/>
+    <rect x="4" y="5" width="2" height="1" fill="#E83F5B"/>
+    <rect x="4" y="6" width="2" height="1" fill="#2DD4FF"/>
+    <rect x="4" y="7" width="2" height="1" fill="#2DD4FF"/>
+    <rect x="4" y="8" width="2" height="1" fill="#2DD4FF"/>
+    <rect x="4" y="9" width="2" height="1" fill="#2DD4FF"/>
+    <!-- Magnet U-shape - right arm -->
+    <rect x="10" y="4" width="2" height="1" fill="#E83F5B"/>
+    <rect x="10" y="5" width="2" height="1" fill="#E83F5B"/>
+    <rect x="10" y="6" width="2" height="1" fill="#2DD4FF"/>
+    <rect x="10" y="7" width="2" height="1" fill="#2DD4FF"/>
+    <rect x="10" y="8" width="2" height="1" fill="#2DD4FF"/>
+    <rect x="10" y="9" width="2" height="1" fill="#2DD4FF"/>
+    <!-- Magnet U-shape - bottom curve -->
+    <rect x="4" y="10" width="2" height="1" fill="#2DD4FF"/>
+    <rect x="10" y="10" width="2" height="1" fill="#2DD4FF"/>
+    <rect x="5" y="11" width="6" height="1" fill="#1B3A9B"/>
+    <rect x="6" y="12" width="4" height="1" fill="#1B3A9B"/>
+    <!-- Magnetic field lines -->
+    <rect x="7" y="5" width="2" height="1" fill="#A8E8E0"/>
+    <rect x="7" y="7" width="2" height="1" fill="#A8E8E0"/>
+    <rect x="7" y="9" width="2" height="1" fill="#A8E8E0"/>
+  </g>
+  <g id="highlight">
+    <rect x="4" y="4" width="1" height="1" fill="#FF2D55"/>
+    <rect x="10" y="4" width="1" height="1" fill="#FF2D55"/>
+  </g>
+</svg>

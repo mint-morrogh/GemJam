@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges">
+  <!-- Wind: Cyan/white swirl lines, leaf particles -->
+  <g id="effects">
+    <!-- Leaf/air particles -->
+    <rect x="4" y="9" width="1" height="1" fill="#3ABF5E"/>
+    <rect x="27" y="11" width="1" height="1" fill="#A8E8E0"/>
+    <rect x="3" y="16" width="1" height="1" fill="#FFFFFF"/>
+    <rect x="28" y="19" width="1" height="1" fill="#A8E8E0"/>
+    <rect x="6" y="24" width="1" height="1" fill="#3ABF5E"/>
+    <rect x="25" y="7" width="1" height="1" fill="#FFFFFF"/>
+    <rect x="5" y="5" width="2" height="1" fill="#A8E8E0"/>
+    <rect x="26" y="24" width="1" height="1" fill="#3ABF5E"/>
+  </g>
+  <g id="base">
+    <!-- Top wind swirl -->
+    <rect x="10" y="7" width="12" height="1" fill="#A8E8E0"/>
+    <rect x="8" y="8" width="4" height="1" fill="#A8E8E0"/>
+    <rect x="22" y="8" width="3" height="1" fill="#E0E8F0"/>
+    <rect x="7" y="9" width="2" height="1" fill="#A8E8E0"/>
+    <rect x="24" y="9" width="2" height="1" fill="#A8E8E0"/>
+    <rect x="7" y="10" width="1" height="1" fill="#A8E8E0"/>
+    <rect x="25" y="10" width="1" height="1" fill="#A8E8E0"/>
+    <rect x="24" y="11" width="2" height="1" fill="#E0E8F0"/>
+    <rect x="22" y="12" width="3" height="1" fill="#A8E8E0"/>
+    <rect x="14" y="12" width="8" height="1" fill="#E0E8F0"/>
+    <!-- Middle wind swirl -->
+    <rect x="6" y="14" width="14" height="1" fill="#A8E8E0"/>
+    <rect x="5" y="15" width="3" height="1" fill="#2DD4FF"/>
+    <rect x="20" y="15" width="3" height="1" fill="#A8E8E0"/>
+    <rect x="5" y="16" width="2" height="1" fill="#2DD4FF"/>
+    <rect x="22" y="16" width="2" height="1" fill="#A8E8E0"/>
+    <rect x="6" y="17" width="2" height="1" fill="#2DD4FF"/>
+    <rect x="22" y="17" width="2" height="1" fill="#A8E8E0"/>
+    <rect x="7" y="18" width="3" height="1" fill="#A8E8E0"/>
+    <rect x="20" y="18" width="3" height="1" fill="#E0E8F0"/>
+    <rect x="10" y="18" width="10" height="1" fill="#E0E8F0"/>
+    <!-- Bottom wind trail -->
+    <rect x="9" y="21" width="14" height="1" fill="#A8E8E0"/>
+    <rect x="8" y="22" width="3" height="1" fill="#A8E8E0"/>
+    <rect x="23" y="22" width="2" height="1" fill="#E0E8F0"/>
+    <rect x="8" y="23" width="2" height="1" fill="#2DD4FF"/>
+    <rect x="24" y="23" width="1" height="1" fill="#A8E8E0"/>
+    <rect x="9" y="24" width="2" height="1" fill="#2DD4FF"/>
+    <rect x="22" y="24" width="3" height="1" fill="#A8E8E0"/>
+    <rect x="11" y="24" width="11" height="1" fill="#E0E8F0"/>
+    <!-- Small leaf shapes -->
+    <rect x="15" y="10" width="2" height="1" fill="#3ABF5E"/>
+    <rect x="16" y="11" width="1" height="1" fill="#1B6B3A"/>
+    <rect x="12" y="20" width="2" height="1" fill="#3ABF5E"/>
+    <rect x="13" y="19" width="1" height="1" fill="#1B6B3A"/>
+  </g>
+  <g id="outline">
+    <!-- Top swirl outline -->
+    <rect x="10" y="6" width="12" height="1" fill="#0A0A14"/>
+    <rect x="8" y="7" width="2" height="1" fill="#0A0A14"/>
+    <rect x="22" y="7" width="3" height="1" fill="#0A0A14"/>
+    <rect x="6" y="8" width="2" height="1" fill="#0A0A14"/>
+    <rect x="25" y="8" width="1" height="1" fill="#0A0A14"/>
+    <rect x="6" y="9" width="1" height="2" fill="#0A0A14"/>
+    <rect x="26" y="9" width="1" height="3" fill="#0A0A14"/>
+    <rect x="7" y="11" width="1" height="1" fill="#0A0A14"/>
+    <rect x="8" y="11" width="6" height="1" fill="#0A0A14"/>
+    <rect x="25" y="12" width="1" height="1" fill="#0A0A14"/>
+    <rect x="14" y="13" width="11" height="1" fill="#0A0A14"/>
+    <!-- Middle swirl outline -->
+    <rect x="6" y="13" width="14" height="1" fill="#0A0A14"/>
+    <rect x="4" y="14" width="2" height="1" fill="#0A0A14"/>
+    <rect x="20" y="14" width="3" height="1" fill="#0A0A14"/>
+    <rect x="4" y="15" width="1" height="2" fill="#0A0A14"/>
+    <rect x="23" y="15" width="1" height="2" fill="#0A0A14"/>
+    <rect x="5" y="17" width="1" height="1" fill="#0A0A14"/>
+    <rect x="24" y="17" width="1" height="1" fill="#0A0A14"/>
+    <rect x="6" y="18" width="1" height="1" fill="#0A0A14"/>
+    <rect x="23" y="18" width="1" height="1" fill="#0A0A14"/>
+    <rect x="7" y="19" width="16" height="1" fill="#0A0A14"/>
+    <!-- Bottom trail outline -->
+    <rect x="9" y="20" width="14" height="1" fill="#0A0A14"/>
+    <rect x="7" y="21" width="2" height="1" fill="#0A0A14"/>
+    <rect x="23" y="21" width="2" height="1" fill="#0A0A14"/>
+    <rect x="7" y="22" width="1" height="2" fill="#0A0A14"/>
+    <rect x="25" y="22" width="1" height="2" fill="#0A0A14"/>
+    <rect x="8" y="24" width="1" height="1" fill="#0A0A14"/>
+    <rect x="9" y="25" width="16" height="1" fill="#0A0A14"/>
+  </g>
+  <g id="highlight">
+    <rect x="11" y="7" width="2" height="1" fill="#FFFFFF"/>
+    <rect x="7" y="14" width="1" height="1" fill="#FFFFFF"/>
+    <rect x="10" y="21" width="1" height="1" fill="#FFFFFF"/>
+  </g>
+</svg>

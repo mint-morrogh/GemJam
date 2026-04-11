@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges">
+  <g id="base">
+    <path d="M 5,2 H 11 V 14 H 5 Z" fill="#3A3A4A"/>
+  </g>
+  <g id="liquid">
+    <path d="M 6,8 H 10 V 13 H 6 Z" fill="#3F6AE8"/>
+  </g>
+  <g id="outline">
+    <path d="M 5,2 H 11 V 14 H 5 Z" fill="none" stroke="#0A0A14" stroke-width="1"/>
+    <rect x="6" y="1" width="4" height="1" fill="#8B6914" stroke="#0A0A14" stroke-width="1"/>
+  </g>
+  <g id="highlight">
+    <rect x="6" y="3" width="1" height="10" fill="#5A5A6A"/>
+    <rect x="7" y="11" width="1" height="1" fill="#2D7FFF"/>
+    <rect x="8" y="10" width="1" height="1" fill="#2D7FFF"/>
+  </g>
+</svg>

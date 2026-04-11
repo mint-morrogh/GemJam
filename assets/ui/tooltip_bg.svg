@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" shape-rendering="crispEdges">
+  <!-- Tooltip background: 9-slice compatible, semi-dark with thin gold edge -->
+  <g id="outline">
+    <!-- Outer border -->
+    <rect x="0" y="0" width="24" height="1" fill="#0A0A14"/>
+    <rect x="0" y="23" width="24" height="1" fill="#0A0A14"/>
+    <rect x="0" y="0" width="1" height="24" fill="#0A0A14"/>
+    <rect x="23" y="0" width="1" height="24" fill="#0A0A14"/>
+  </g>
+  <g id="base">
+    <!-- Gold trim (thin, 1px) -->
+    <rect x="1" y="1" width="22" height="1" fill="#E8B83F"/>
+    <rect x="1" y="22" width="22" height="1" fill="#8B6914"/>
+    <rect x="1" y="1" width="1" height="22" fill="#E8B83F"/>
+    <rect x="22" y="1" width="1" height="22" fill="#8B6914"/>
+    <!-- Semi-dark fill -->
+    <rect x="2" y="2" width="20" height="20" fill="#2A2A3A"/>
+    <!-- Subtle inner top highlight -->
+    <rect x="2" y="2" width="20" height="1" fill="#3A3A4A"/>
+  </g>
+  <g id="highlight">
+    <!-- Gold corner accents -->
+    <rect x="1" y="1" width="1" height="1" fill="#FFD52D"/>
+    <rect x="22" y="1" width="1" height="1" fill="#E8B83F"/>
+  </g>
+</svg>

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 16" shape-rendering="crispEdges">
+  <!-- Hovered button: Lighter stone with highlight edge -->
+  <g id="outline">
+    <rect x="0" y="0" width="48" height="16" fill="#0A0A14"/>
+  </g>
+  <g id="base">
+    <!-- Main fill (lighter) -->
+    <rect x="1" y="1" width="46" height="14" fill="#5A5A6A"/>
+    <!-- Top bevel (bright) -->
+    <rect x="1" y="1" width="46" height="1" fill="#A8B8C8"/>
+    <!-- Left bevel (bright) -->
+    <rect x="1" y="1" width="1" height="14" fill="#A8B8C8"/>
+    <!-- Bottom bevel (dark) -->
+    <rect x="1" y="14" width="46" height="1" fill="#3A3A4A"/>
+    <!-- Right bevel (dark) -->
+    <rect x="46" y="1" width="1" height="14" fill="#3A3A4A"/>
+  </g>
+  <g id="highlight">
+    <!-- Highlight edge glow -->
+    <rect x="2" y="2" width="44" height="1" fill="#E0E8F0"/>
+  </g>
+</svg>

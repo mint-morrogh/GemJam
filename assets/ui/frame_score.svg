@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 16" shape-rendering="crispEdges">
+  <!-- Score display frame: Gold border, dark fill -->
+  <g id="outline">
+    <rect x="0" y="0" width="48" height="16" fill="#0A0A14"/>
+  </g>
+  <g id="base">
+    <!-- Gold outer border -->
+    <rect x="1" y="1" width="46" height="14" fill="#E8B83F"/>
+    <!-- Dark amber inner border -->
+    <rect x="2" y="2" width="44" height="12" fill="#8B6914"/>
+    <!-- Dark fill interior -->
+    <rect x="3" y="3" width="42" height="10" fill="#1A1A2A"/>
+    <!-- Inner bevel top (subtle) -->
+    <rect x="3" y="3" width="42" height="1" fill="#0A0A14"/>
+    <!-- Inner bevel left (subtle) -->
+    <rect x="3" y="3" width="1" height="10" fill="#0A0A14"/>
+  </g>
+  <g id="highlight">
+    <!-- Gold shine on top-left -->
+    <rect x="1" y="1" width="2" height="1" fill="#FFD52D"/>
+    <rect x="1" y="1" width="1" height="2" fill="#FFD52D"/>
+    <!-- Gold shine on top-right corner -->
+    <rect x="45" y="1" width="1" height="1" fill="#FFD52D"/>
+  </g>
+</svg>

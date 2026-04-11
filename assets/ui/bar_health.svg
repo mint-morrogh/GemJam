@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 6" shape-rendering="crispEdges">
+  <!-- Health bar: Red fill on dark track -->
+  <g id="outline">
+    <rect x="0" y="0" width="32" height="6" fill="#0A0A14"/>
+  </g>
+  <g id="base">
+    <!-- Dark track background -->
+    <rect x="1" y="1" width="30" height="4" fill="#2A2A3A"/>
+    <!-- Red health fill (showing ~75% full as example) -->
+    <rect x="1" y="1" width="22" height="4" fill="#E83F5B"/>
+    <!-- Darker red bottom half for depth -->
+    <rect x="1" y="3" width="22" height="2" fill="#9B1B30"/>
+  </g>
+  <g id="highlight">
+    <!-- Bright top edge on fill -->
+    <rect x="1" y="1" width="22" height="1" fill="#FF2D55"/>
+    <!-- Small shine -->
+    <rect x="2" y="1" width="2" height="1" fill="#FFFFFF"/>
+  </g>
+</svg>

@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GemJam — Asset Preview (1x &amp; 2x)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0A0A14;
+    color: #E0E8F0;
+    font-family: "Courier New", monospace;
+    padding: 24px;
+  }
+  h1 {
+    font-size: 20px;
+    margin-bottom: 8px;
+    color: #FFD52D;
+  }
+  h2 {
+    font-size: 16px;
+    margin: 32px 0 12px;
+    color: #E8B83F;
+    border-bottom: 1px solid #3A3A4A;
+    padding-bottom: 4px;
+  }
+  .subtitle {
+    font-size: 12px;
+    color: #5A5A6A;
+    margin-bottom: 24px;
+  }
+  .grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .card {
+    background: #1A1A2A;
+    border: 1px solid #3A3A4A;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .card .label {
+    font-size: 10px;
+    color: #A8B8C8;
+    text-align: center;
+    word-break: break-all;
+    max-width: 120px;
+  }
+  .previews {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  .scale-label {
+    font-size: 9px;
+    color: #5A5A6A;
+    text-align: center;
+  }
+  .preview-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  /* Checkerboard background to show transparency */
+  .preview-bg {
+    background-image:
+      linear-gradient(45deg, #2A2A3A 25%, transparent 25%),
+      linear-gradient(-45deg, #2A2A3A 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #2A2A3A 75%),
+      linear-gradient(-45deg, transparent 75%, #2A2A3A 75%);
+    background-size: 8px 8px;
+    background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+    background-color: #1A1A2A;
+    display: inline-block;
+    line-height: 0;
+  }
+  img {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    display: block;
+  }
+  .palette-section {
+    margin: 32px 0 16px;
+  }
+  .palette-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  .swatch {
+    width: 24px;
+    height: 24px;
+    border: 1px solid #4A4A5A;
+    display: inline-block;
+    position: relative;
+  }
+  .swatch:hover::after {
+    content: attr(data-hex);
+    position: absolute;
+    bottom: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    color: #E0E8F0;
+    background: #2A2A3A;
+    padding: 1px 4px;
+    white-space: nowrap;
+    z-index: 10;
+  }
+  .stats {
+    font-size: 11px;
+    color: #5A5A6A;
+    margin-top: 32px;
+    border-top: 1px solid #3A3A4A;
+    padding-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<h1>GemJam Asset Preview</h1>
+<p class="subtitle">All assets shown at 1x (native) and 2x (upscaled, pixelated). Background uses checkerboard to reveal transparency.</p>
+
+<!-- Palette Reference -->
+<h2>Color Palette (32 colors)</h2>
+<div class="palette-row">
+  <span class="swatch" style="background:#0A0A14" data-hex="#0A0A14"></span>
+  <span class="swatch" style="background:#1A1A2A" data-hex="#1A1A2A"></span>
+  <span class="swatch" style="background:#2A2A3A" data-hex="#2A2A3A"></span>
+  <span class="swatch" style="background:#3A3A4A" data-hex="#3A3A4A"></span>
+  <span class="swatch" style="background:#4A4A5A" data-hex="#4A4A5A"></span>
+  <span class="swatch" style="background:#5A5A6A" data-hex="#5A5A6A"></span>
+  <span class="swatch" style="background:#A8B8C8" data-hex="#A8B8C8"></span>
+  <span class="swatch" style="background:#E0E8F0" data-hex="#E0E8F0"></span>
+  <span class="swatch" style="background:#9B1B30" data-hex="#9B1B30"></span>
+  <span class="swatch" style="background:#E83F5B" data-hex="#E83F5B"></span>
+  <span class="swatch" style="background:#FF2D55" data-hex="#FF2D55"></span>
+  <span class="swatch" style="background:#1B3A9B" data-hex="#1B3A9B"></span>
+  <span class="swatch" style="background:#3F6AE8" data-hex="#3F6AE8"></span>
+  <span class="swatch" style="background:#2D7FFF" data-hex="#2D7FFF"></span>
+  <span class="swatch" style="background:#1B6B3A" data-hex="#1B6B3A"></span>
+  <span class="swatch" style="background:#3ABF5E" data-hex="#3ABF5E"></span>
+  <span class="swatch" style="background:#2DFF6A" data-hex="#2DFF6A"></span>
+  <span class="swatch" style="background:#8B6914" data-hex="#8B6914"></span>
+  <span class="swatch" style="background:#E8B83F" data-hex="#E8B83F"></span>
+  <span class="swatch" style="background:#FFD52D" data-hex="#FFD52D"></span>
+  <span class="swatch" style="background:#5B1B8B" data-hex="#5B1B8B"></span>
+  <span class="swatch" style="background:#9B3FE8" data-hex="#9B3FE8"></span>
+  <span class="swatch" style="background:#C02DFF" data-hex="#C02DFF"></span>
+  <span class="swatch" style="background:#FF6B2D" data-hex="#FF6B2D"></span>
+  <span class="swatch" style="background:#2DD4FF" data-hex="#2DD4FF"></span>
+  <span class="swatch" style="background:#A8E8E0" data-hex="#A8E8E0"></span>
+  <span class="swatch" style="background:#2D1B4A" data-hex="#2D1B4A"></span>
+  <span class="swatch" style="background:#FFFFFF" data-hex="#FFFFFF"></span>
+  <span class="swatch" style="background:#1B2B3B" data-hex="#1B2B3B"></span>
+  <span class="swatch" style="background:#E8D83F" data-hex="#E8D83F"></span>
+  <span class="swatch" style="background:#E8753F" data-hex="#E8753F"></span>
+  <span class="swatch" style="background:#3FE85B" data-hex="#3FE85B"></span>
+</div>
+
+<!-- GEMS -->
+<h2>Gems (16x16) — 15 assets</h2>
+<div class="grid">
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_ruby_raw.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_ruby_raw.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">gem_ruby_raw</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_ruby_cut.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_ruby_cut.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">gem_ruby_cut</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_ruby_perfect.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_ruby_perfect.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">gem_ruby_perfect</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_sapphire_raw.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_sapphire_raw.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">gem_sapphire_raw</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_sapphire_cut.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_sapphire_cut.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">gem_sapphire_cut</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_sapphire_perfect.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_sapphire_perfect.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">gem_sapphire_perfect</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_emerald_raw.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_emerald_raw.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">gem_emerald_raw</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_emerald_cut.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_emerald_cut.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">gem_emerald_cut</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_emerald_perfect.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_emerald_perfect.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">gem_emerald_perfect</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_topaz_raw.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_topaz_raw.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">gem_topaz_raw</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_topaz_cut.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_topaz_cut.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">gem_topaz_cut</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_topaz_perfect.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_topaz_perfect.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">gem_topaz_perfect</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_amethyst_raw.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_amethyst_raw.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">gem_amethyst_raw</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_amethyst_cut.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_amethyst_cut.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">gem_amethyst_cut</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_amethyst_perfect.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="gems/gem_amethyst_perfect.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">gem_amethyst_perfect</span>
+  </div>
+</div>
+
+<!-- POTIONS -->
+<h2>Potions (16x16) — 12 assets</h2>
+<div class="grid">
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_health.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_health.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">potion_health</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_mana.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_mana.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">potion_mana</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_speed.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_speed.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">potion_speed</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_strength.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_strength.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">potion_strength</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_shield.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_shield.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">potion_shield</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_poison.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_poison.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">potion_poison</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_fire.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_fire.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">potion_fire</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_ice.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_ice.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">potion_ice</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_luck.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_luck.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">potion_luck</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_invisibility.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_invisibility.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">potion_invisibility</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_rage.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_rage.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">potion_rage</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_wisdom.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="potions/potion_wisdom.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">potion_wisdom</span>
+  </div>
+</div>
+
+<!-- SPELLS -->
+<h2>Spells (32x32) — 8 assets</h2>
+<div class="grid">
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="spells/spell_fireball.svg" width="32" height="32"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="spells/spell_fireball.svg" width="64" height="64"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">spell_fireball</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="spells/spell_ice_shard.svg" width="32" height="32"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="spells/spell_ice_shard.svg" width="64" height="64"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">spell_ice_shard</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="spells/spell_lightning.svg" width="32" height="32"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="spells/spell_lightning.svg" width="64" height="64"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">spell_lightning</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="spells/spell_heal.svg" width="32" height="32"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="spells/spell_heal.svg" width="64" height="64"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">spell_heal</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="spells/spell_arcane.svg" width="32" height="32"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="spells/spell_arcane.svg" width="64" height="64"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">spell_arcane</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="spells/spell_earth.svg" width="32" height="32"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="spells/spell_earth.svg" width="64" height="64"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">spell_earth</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="spells/spell_wind.svg" width="32" height="32"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="spells/spell_wind.svg" width="64" height="64"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">spell_wind</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="spells/spell_dark.svg" width="32" height="32"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="spells/spell_dark.svg" width="64" height="64"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">spell_dark</span>
+  </div>
+</div>
+
+<!-- UPGRADES -->
+<h2>Upgrades (16x16) — 8 assets</h2>
+<div class="grid">
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="upgrades/upgrade_damage.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="upgrades/upgrade_damage.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">upgrade_damage</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="upgrades/upgrade_speed.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="upgrades/upgrade_speed.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">upgrade_speed</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="upgrades/upgrade_shield.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="upgrades/upgrade_shield.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">upgrade_shield</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="upgrades/upgrade_multi_merge.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="upgrades/upgrade_multi_merge.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">upgrade_multi_merge</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="upgrades/upgrade_magnet.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="upgrades/upgrade_magnet.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">upgrade_magnet</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="upgrades/upgrade_luck.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="upgrades/upgrade_luck.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">upgrade_luck</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="upgrades/upgrade_xp_boost.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="upgrades/upgrade_xp_boost.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">upgrade_xp_boost</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="upgrades/upgrade_chain.svg" width="16" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="upgrades/upgrade_chain.svg" width="32" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">upgrade_chain</span>
+  </div>
+</div>
+
+<!-- UI ELEMENTS -->
+<h2>UI Elements (various sizes) — 9 assets</h2>
+<div class="grid">
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="ui/btn_normal.svg" width="48" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="ui/btn_normal.svg" width="96" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">btn_normal</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="ui/btn_hover.svg" width="48" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="ui/btn_hover.svg" width="96" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">btn_hover</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="ui/btn_pressed.svg" width="48" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="ui/btn_pressed.svg" width="96" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">btn_pressed</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="ui/panel_border.svg" width="24" height="24"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="ui/panel_border.svg" width="48" height="48"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">panel_border</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="ui/bar_health.svg" width="32" height="6"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="ui/bar_health.svg" width="64" height="12"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">bar_health</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="ui/bar_mana.svg" width="32" height="6"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="ui/bar_mana.svg" width="64" height="12"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">bar_mana</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="ui/frame_score.svg" width="48" height="16"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="ui/frame_score.svg" width="96" height="32"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">frame_score</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="ui/slot_inventory.svg" width="18" height="18"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="ui/slot_inventory.svg" width="36" height="36"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">slot_inventory</span>
+  </div>
+  <div class="card">
+    <div class="previews">
+      <div class="preview-col"><div class="preview-bg"><img src="ui/tooltip_bg.svg" width="24" height="24"></div><span class="scale-label">1x</span></div>
+      <div class="preview-col"><div class="preview-bg"><img src="ui/tooltip_bg.svg" width="48" height="48"></div><span class="scale-label">2x</span></div>
+    </div>
+    <span class="label">tooltip_bg</span>
+  </div>
+</div>
+
+<div class="stats">
+  <p>Total assets: 52 (15 gems + 12 potions + 8 spells + 8 upgrades + 9 UI)</p>
+  <p>Palette: 32 colors | Outline: 1px #0A0A14 | Rendering: crispEdges / pixelated</p>
+</div>
+
+</body>
+</html>

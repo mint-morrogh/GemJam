@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges">
+  <!-- Heal: Green glow, cross shape, healing particles -->
+  <g id="effects">
+    <!-- Healing particles (green sparkles) -->
+    <rect x="6" y="8" width="1" height="1" fill="#2DFF6A"/>
+    <rect x="25" y="6" width="1" height="1" fill="#FFFFFF"/>
+    <rect x="4" y="18" width="1" height="1" fill="#2DFF6A"/>
+    <rect x="27" y="20" width="1" height="1" fill="#FFFFFF"/>
+    <rect x="8" y="25" width="1" height="1" fill="#2DFF6A"/>
+    <rect x="24" y="25" width="1" height="1" fill="#2DFF6A"/>
+    <rect x="7" y="4" width="1" height="1" fill="#FFFFFF"/>
+    <rect x="24" y="4" width="1" height="1" fill="#FFFFFF"/>
+    <!-- Soft glow aura -->
+    <rect x="12" y="5" width="8" height="1" fill="#2DFF6A" opacity="0.3"/>
+    <rect x="5" y="12" width="1" height="8" fill="#2DFF6A" opacity="0.3"/>
+    <rect x="26" y="12" width="1" height="8" fill="#2DFF6A" opacity="0.3"/>
+    <rect x="12" y="26" width="8" height="1" fill="#2DFF6A" opacity="0.3"/>
+  </g>
+  <g id="base">
+    <!-- Cross shape - vertical bar -->
+    <rect x="13" y="7" width="6" height="1" fill="#2DFF6A"/>
+    <rect x="13" y="8" width="6" height="1" fill="#3ABF5E"/>
+    <rect x="13" y="9" width="6" height="1" fill="#3ABF5E"/>
+    <rect x="13" y="10" width="6" height="1" fill="#3ABF5E"/>
+    <rect x="13" y="11" width="6" height="1" fill="#3ABF5E"/>
+    <!-- Cross shape - horizontal bar -->
+    <rect x="7" y="12" width="18" height="1" fill="#2DFF6A"/>
+    <rect x="7" y="13" width="18" height="1" fill="#3ABF5E"/>
+    <rect x="7" y="14" width="18" height="1" fill="#3ABF5E"/>
+    <rect x="7" y="15" width="18" height="1" fill="#3ABF5E"/>
+    <rect x="7" y="16" width="18" height="1" fill="#3ABF5E"/>
+    <rect x="7" y="17" width="18" height="1" fill="#1B6B3A"/>
+    <rect x="7" y="18" width="18" height="1" fill="#1B6B3A"/>
+    <rect x="7" y="19" width="18" height="1" fill="#1B6B3A"/>
+    <!-- Cross shape - vertical bar continued -->
+    <rect x="13" y="20" width="6" height="1" fill="#1B6B3A"/>
+    <rect x="13" y="21" width="6" height="1" fill="#1B6B3A"/>
+    <rect x="13" y="22" width="6" height="1" fill="#1B6B3A"/>
+    <rect x="13" y="23" width="6" height="1" fill="#1B6B3A"/>
+    <rect x="13" y="24" width="6" height="1" fill="#1B6B3A"/>
+    <!-- Inner highlight cross -->
+    <rect x="15" y="9" width="2" height="2" fill="#2DFF6A"/>
+    <rect x="10" y="14" width="2" height="2" fill="#2DFF6A"/>
+    <rect x="20" y="14" width="2" height="2" fill="#3ABF5E"/>
+    <rect x="15" y="14" width="2" height="2" fill="#2DFF6A"/>
+    <rect x="15" y="21" width="2" height="2" fill="#3ABF5E"/>
+  </g>
+  <g id="outline">
+    <!-- Vertical bar top -->
+    <rect x="13" y="6" width="6" height="1" fill="#0A0A14"/>
+    <rect x="12" y="7" width="1" height="5" fill="#0A0A14"/>
+    <rect x="19" y="7" width="1" height="5" fill="#0A0A14"/>
+    <!-- Horizontal bar left -->
+    <rect x="6" y="12" width="1" height="8" fill="#0A0A14"/>
+    <rect x="7" y="11" width="6" height="1" fill="#0A0A14"/>
+    <rect x="7" y="20" width="6" height="1" fill="#0A0A14"/>
+    <!-- Horizontal bar right -->
+    <rect x="25" y="12" width="1" height="8" fill="#0A0A14"/>
+    <rect x="19" y="11" width="6" height="1" fill="#0A0A14"/>
+    <rect x="19" y="20" width="6" height="1" fill="#0A0A14"/>
+    <!-- Vertical bar bottom -->
+    <rect x="12" y="20" width="1" height="5" fill="#0A0A14"/>
+    <rect x="19" y="20" width="1" height="5" fill="#0A0A14"/>
+    <rect x="13" y="25" width="6" height="1" fill="#0A0A14"/>
+  </g>
+  <g id="highlight">
+    <rect x="14" y="7" width="1" height="1" fill="#FFFFFF"/>
+    <rect x="8" y="12" width="1" height="1" fill="#FFFFFF"/>
+    <rect x="14" y="12" width="1" height="1" fill="#FFFFFF"/>
+  </g>
+</svg>

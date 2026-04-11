@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges">
+  <g id="base">
+    <path d="M 5,2 L 8,2 L 8,7 L 1,7 Z" fill="#C02DFF"/>
+    <path d="M 8,2 L 11,2 L 15,7 L 8,7 Z" fill="#9B3FE8"/>
+    <path d="M 1,7 L 8,7 L 8,14 Z" fill="#9B3FE8"/>
+    <path d="M 8,7 L 15,7 L 8,14 Z" fill="#5B1B8B"/>
+  </g>
+  <g id="outline">
+    <path d="M 5,2 L 11,2 L 15,7 L 8,14 L 1,7 Z" fill="none" stroke="#0A0A14" stroke-width="1"/>
+    <line x1="1" y1="7" x2="15" y2="7" stroke="#5B1B8B" stroke-width="1"/>
+    <line x1="8" y1="2" x2="8" y2="14" stroke="#5B1B8B" stroke-width="1"/>
+  </g>
+  <g id="highlight">
+    <rect x="4" y="3" width="1" height="1" fill="#FFFFFF"/>
+  </g>
+</svg>

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges">
+  <!-- Chain Combo: Orange chain links on red badge -->
+  <g id="outline">
+    <rect x="1" y="1" width="14" height="14" fill="none" stroke="#4A4A5A" stroke-width="1"/>
+  </g>
+  <g id="base">
+    <!-- Badge fill -->
+    <rect x="2" y="2" width="12" height="12" fill="#9B1B30"/>
+    <!-- Top chain link (oval) -->
+    <rect x="5" y="3" width="3" height="1" fill="#FF6B2D"/>
+    <rect x="4" y="4" width="1" height="2" fill="#FF6B2D"/>
+    <rect x="8" y="4" width="1" height="2" fill="#E8B83F"/>
+    <rect x="5" y="6" width="3" height="1" fill="#E8B83F"/>
+    <rect x="5" y="4" width="3" height="1" fill="#FFD52D"/>
+    <rect x="5" y="5" width="3" height="1" fill="#FF6B2D"/>
+    <!-- Middle connector -->
+    <rect x="6" y="7" width="2" height="1" fill="#E8B83F"/>
+    <rect x="7" y="7" width="2" height="1" fill="#FF6B2D"/>
+    <!-- Bottom chain link (oval) -->
+    <rect x="7" y="8" width="3" height="1" fill="#FF6B2D"/>
+    <rect x="6" y="9" width="1" height="2" fill="#FF6B2D"/>
+    <rect x="10" y="9" width="1" height="2" fill="#E8B83F"/>
+    <rect x="7" y="11" width="3" height="1" fill="#E8B83F"/>
+    <rect x="7" y="9" width="3" height="1" fill="#FFD52D"/>
+    <rect x="7" y="10" width="3" height="1" fill="#FF6B2D"/>
+    <!-- Combo spark -->
+    <rect x="11" y="4" width="1" height="1" fill="#FFD52D"/>
+    <rect x="12" y="3" width="1" height="1" fill="#FFFFFF"/>
+    <rect x="3" y="12" width="1" height="1" fill="#FFD52D"/>
+  </g>
+  <g id="highlight">
+    <rect x="5" y="3" width="1" height="1" fill="#FFFFFF"/>
+    <rect x="7" y="8" width="1" height="1" fill="#FFFFFF"/>
+  </g>
+</svg>
