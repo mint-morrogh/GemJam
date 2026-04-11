@@ -187,12 +187,6 @@ export function drawLauncherGem(
     ctx.beginPath();
     ctx.arc(launchX, launchY, displayR + 10, 0, Math.PI * 2);
     ctx.fill();
-    ctx.globalAlpha = 0.9;
-    ctx.font = `bold ${IS_PORTRAIT ? 10 : 9}px monospace`;
-    ctx.fillStyle = '#C084FC';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('BLACK HOLE', launchX, launchY);
     ctx.restore();
   }
 
@@ -450,12 +444,6 @@ export function drawNextGemPanel(ctx: CanvasRenderingContext2D, queue: readonly 
       ctx.beginPath();
       ctx.arc(slotX, centerY - 2, Math.min(item.def.radius, 20) + 5, 0, Math.PI * 2);
       ctx.fill();
-      ctx.globalAlpha = alpha * 0.8;
-      ctx.font = 'bold 7px monospace';
-      ctx.fillStyle = '#C084FC';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('BH', slotX, centerY - 2);
       ctx.restore();
     }
 

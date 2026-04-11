@@ -192,7 +192,8 @@ export function emitMergeBurst(x: number, y: number, tier: number, rainbow = fal
   if (!def) return;
 
   // Rock tiers (0-3): gray/white particles. Gem tiers (4+): tier color. Rainbow: rainbow.
-  const isRock = tier <= 3;
+  // Only pebble (tier 0) gets gray particles — all others use tier color
+  const isRock = tier === 0;
   const ROCK_COLORS = ['#C0B8A8', '#A0A0A0', '#D0D0D0', '#FFFFFF'];
   const getColor = rainbow
     ? randomRainbow
