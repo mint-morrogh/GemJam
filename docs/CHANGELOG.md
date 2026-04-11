@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Auto-shake toggle on mobile: when auto-shake is OFF, random gravity oscillation was still applied — gems shook even with the phone held still. Now only real device motion drives shake gravity when auto-shake is disabled.
+
 ### Changed
 - Replaced procedural pixel-art gem sprites with 12 photo-quality sphere PNGs (pebble + tier1-11)
 - Expanded from 8 to 12 gem tiers: pebble, ore, geode, cluster, garnet, sapphire, emerald, topaz, amethyst, aquamarine, ruby, diamond

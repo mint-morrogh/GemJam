@@ -162,26 +162,36 @@ let shakeDirTimer = 0;
 export function getShakeGravity(): { gx: number; gy: number } | null {
   if (ls.phase !== 'shaking') return null;
 
-  // Change shake direction randomly every 50-120ms for chaotic jolts
-  shakeDirTimer -= 1 / 60;
-  if (shakeDirTimer <= 0) {
-    const angle = Math.random() * Math.PI * 2;
-    const strength = 60 + Math.random() * 50; // 60-110 m/s²
-    shakeDir = { x: Math.cos(angle) * strength, y: Math.sin(angle) * strength };
-    shakeDirTimer = 0.05 + Math.random() * 0.07;
+  const useAutoShake = !IS_MOBILE || autoShakeMobile;
+
+  if (useAutoShake) {
+    // Auto-shake: random gravity oscillation every 50-120ms for chaotic jolts
+    shakeDirTimer -= 1 / 60;
+    if (shakeDirTimer <= 0) {
+      const angle = Math.random() * Math.PI * 2;
+      const strength = 60 + Math.random() * 50; // 60-110 m/s²
+      shakeDir = { x: Math.cos(angle) * strength, y: Math.sin(angle) * strength };
+      shakeDirTimer = 0.05 + Math.random() * 0.07;
+    }
+    return {
+      gx: shakeDir.x + (Math.random() - 0.5) * 20,
+      gy: shakeDir.y + (Math.random() - 0.5) * 20,
+    };
   }
 
-  // Device motion adds on top if available
-  let deviceBoost = 0;
-  if (IS_MOBILE && !autoShakeMobile && motionMagnitude > 0.3) {
+  // Mobile with auto-shake OFF: only device motion drives gravity
+  if (motionMagnitude > 0.3) {
     ls.shakeScore += motionMagnitude;
-    deviceBoost = Math.min(motionMagnitude * 8, 60);
+    const strength = Math.min(motionMagnitude * 10, 100);
+    const angle = Math.random() * Math.PI * 2;
+    return {
+      gx: Math.cos(angle) * strength + (Math.random() - 0.5) * 10,
+      gy: Math.sin(angle) * strength + (Math.random() - 0.5) * 10,
+    };
   }
 
-  return {
-    gx: shakeDir.x + (Math.random() - 0.5) * (20 + deviceBoost),
-    gy: shakeDir.y + (Math.random() - 0.5) * (20 + deviceBoost),
-  };
+  // No device motion — normal downward gravity (gems just sit there)
+  return { gx: 0, gy: 25 };
 }
 
 /** Update the level interlude state machine. Returns true if gameplay is blocked. */
