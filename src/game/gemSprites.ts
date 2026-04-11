@@ -41,7 +41,7 @@ const baseImageMap = new Map<string, HTMLImageElement>();
 for (const entry of TIER_SPRITES) {
   if (!baseImageMap.has(entry.file)) {
     const img = new Image();
-    img.src = `/gems/spheres/${entry.file}`;
+    img.src = `${import.meta.env.BASE_URL}gems/spheres/${entry.file}`;
     baseImageMap.set(entry.file, img);
   }
 }

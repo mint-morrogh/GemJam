@@ -1,12 +1,11 @@
 import { refreshDpr, getDpr } from './game/renderConfig';
 
-/** Whether the initial viewport is portrait mobile (<=768px wide). */
-export const IS_PORTRAIT = window.innerWidth <= 768 && window.innerWidth < window.innerHeight;
+/** Whether the viewport is portrait-oriented (mobile or narrow desktop). */
+export const IS_PORTRAIT = true; // always use portrait layout — game scales to fit
 
-/** Virtual resolution — all game drawing uses these coordinates.
- *  Portrait mobile uses a taller virtual space so the board fills ~65% of height. */
-export const VIRTUAL_WIDTH = IS_PORTRAIT ? 480 : 1280;
-export const VIRTUAL_HEIGHT = IS_PORTRAIT ? 960 : 720;
+/** Virtual resolution — all game drawing uses these coordinates. */
+export const VIRTUAL_WIDTH = 480;
+export const VIRTUAL_HEIGHT = 960;
 export const ASPECT_RATIO = VIRTUAL_WIDTH / VIRTUAL_HEIGHT;
 
 export interface CanvasHandle {
@@ -46,28 +45,22 @@ function applyLetterboxStyle(): void {
   document.body.style.position = 'relative';
 }
 
-/** Max canvas CSS width on desktop to prevent the game from stretching
- *  across ultra-wide monitors. Matches the #app max-width breakpoint. */
-const MAX_DESKTOP_WIDTH = 1400;
-
 /**
  * Calculate CSS dimensions that fit the viewport while preserving aspect ratio.
- * On desktop (>=769px), caps width to MAX_DESKTOP_WIDTH so the board centers
- * at a comfortable size rather than filling enormous screens.
+ * Always portrait — on desktop the canvas scales to fill viewport height and centers.
  */
 function fitToViewport(): { cssWidth: number; cssHeight: number } {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
 
-  // Cap width on desktop screens to match the CSS max-width breakpoint
-  const effectiveWidth = (!IS_PORTRAIT && vw >= 769) ? Math.min(vw, MAX_DESKTOP_WIDTH) : vw;
+  // Fit to height first, then check width
+  // Scale to fit height, then clamp to viewport width if needed
+  let cssHeight = vh;
+  let cssWidth = vh * ASPECT_RATIO;
 
-  let cssWidth = effectiveWidth;
-  let cssHeight = effectiveWidth / ASPECT_RATIO;
-
-  if (cssHeight > vh) {
-    cssHeight = vh;
-    cssWidth = vh * ASPECT_RATIO;
+  if (cssWidth > vw) {
+    cssWidth = vw;
+    cssHeight = vw / ASPECT_RATIO;
   }
 
   return { cssWidth, cssHeight };
