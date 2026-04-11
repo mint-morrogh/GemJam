@@ -56,6 +56,12 @@ export function getScreenShake(): { x: number; y: number } {
   };
 }
 
+/** Trigger screen shake externally (e.g. from volatile explosions). */
+export function triggerScreenShake(intensity: number, decay = 8): void {
+  shakeIntensity = Math.max(shakeIntensity, intensity);
+  shakeDecay = decay;
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------

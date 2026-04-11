@@ -1,8 +1,7 @@
 import { mergeQueue, pendingBodies } from './mergeDetector';
 import { spawnGem, getGemData } from './gemSpawner';
-import { GEM_TIERS } from './gems';
 import { getBonusGemSpawnChance, getExplosionChance } from './state';
-import { addMergeAnimation } from './mergeAnimation';
+import { addMergeAnimation, triggerScreenShake } from './mergeAnimation';
 import { emitMergeBurst } from './particles';
 import { bodyVel, bodyAngVel, bodyMass, bodyPos, bodyId, setVelocity, setAngularVelocity, dynamicBodies, type Body } from '../physics/planckWorld';
 import { Vec2 } from 'planck';
@@ -80,43 +79,47 @@ export function processMerges(world: World): Body[] {
       bonusGemSpawned = true;
     }
 
-    // Explosion: push all nearby gems away from merge point
+    // Explosion: massive shockwave that rattles the whole well
     let exploded = false;
     const expChance = getExplosionChance();
     if (expChance > 0 && Math.random() < expChance) {
       exploded = true;
       const tier = event.nextTier;
-      const def = GEM_TIERS[tier];
-      // Radius and force scale with tier
-      const blastRadius = (def?.radius ?? 40) * 3 + tier * 15; // px
-      const blastForce = 150 + tier * 80; // impulse strength
+      // Huge radius — covers most of the well. Force scales hard with tier.
+      const blastRadius = 300 + tier * 30;
+      const blastForce = 800 + tier * 400;
 
       for (const b of dynamicBodies(world)) {
         if (b === newBody) continue;
         if (!getGemData(b)) continue;
+        if (!b.isAwake()) b.setAwake(true);
         const bPos = bodyPos(b);
         const dx = bPos.x - event.midX;
         const dy = bPos.y - event.midY;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist > blastRadius || dist < 1) continue;
+        if (dist < 1) continue;
 
-        // Falloff: closer = stronger push
-        const falloff = 1 - dist / blastRadius;
-        const force = blastForce * falloff * falloff;
+        // Everything in range gets blasted — falloff is gentle
+        const falloff = dist < blastRadius ? (1 - dist / blastRadius) : 0;
+        if (falloff <= 0) continue;
+        const force = blastForce * falloff;
         const nx = dx / dist;
         const ny = dy / dist;
-        // Wake the body and apply impulse
-        if (!b.isAwake()) b.setAwake(true);
         b.applyLinearImpulse(
-          Vec2(nx * force / 30 * b.getMass(), ny * force / 30 * b.getMass()),
+          Vec2(nx * force / 30, (ny - 0.3) * force / 30),
           b.getWorldCenter(),
           true,
         );
       }
 
-      // Extra burst particles for the explosion
+      // Heavy screen shake — scales with tier
+      triggerScreenShake(5 + tier * 2, 6);
+
+      // Big explosion visuals — 4 layered particle bursts
+      emitMergeBurst(event.midX, event.midY, Math.min(tier + 3, 11), event.rainbow);
       emitMergeBurst(event.midX, event.midY, Math.min(tier + 2, 11), event.rainbow);
       emitMergeBurst(event.midX, event.midY, Math.min(tier + 1, 11), event.rainbow);
+      emitMergeBurst(event.midX, event.midY, tier, event.rainbow);
     }
 
     _onMerge?.(event.nextTier, event.rainbow, event.midX, event.midY, bonusMerge, event.tierSkipped, bonusGemSpawned, exploded);

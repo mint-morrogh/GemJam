@@ -20,14 +20,14 @@
 // phone viewing distances. Layout (CSS dimensions) is unaffected.
 
 /** Hard ceiling on DPR used for canvas backing store. */
-let maxDpr = 3;
+let maxDpr = 2;
 
 /**
  * Maximum total pixels for the canvas backing store.
  * If the capped buffer would exceed this budget, DPR is reduced further.
  * Default ~3.7M (1280×2 × 720×2) — comfortably within mobile GPU budgets.
  */
-let pixelBudget = 480 * 3 * 960 * 3; // 4,147,200 — supports DPR 3 at portrait res
+let pixelBudget = 1280 * 2 * 720 * 2; // 3,686,400
 
 /** Set the DPR cap. Values < 1 are clamped to 1. */
 export function setMaxDpr(cap: number): void {
@@ -58,13 +58,6 @@ let rawDpr = dpr;
  *  Pass virtualWidth/virtualHeight so the pixel budget can be enforced. */
 export function refreshDpr(virtualWidth?: number, virtualHeight?: number): void {
   rawDpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
-
-  // On desktop (DPR 1), calculate how much the canvas is being stretched
-  // and use at least that ratio so text/sprites aren't fuzzy
-  if (rawDpr <= 1 && typeof window !== 'undefined') {
-    const cssScale = Math.min(window.innerHeight / (virtualHeight || 960), window.innerWidth / (virtualWidth || 480));
-    if (cssScale > 1) rawDpr = Math.min(cssScale, maxDpr);
-  }
 
   // Apply cap
   let effective = Math.min(rawDpr, maxDpr);

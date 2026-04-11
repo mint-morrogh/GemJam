@@ -373,7 +373,7 @@ input.onFire = (aimX, aimY) => {
   if (state.gameOver) return;
   if (fireCooldown > 0) return;
   if (resumeCooldown > 0) return;
-  if (overflowTimer > 0) return; // can't fire while countdown is active
+  // Player can still fire during danger — countdown only resets when line is clear
   if (getShakePhase() !== 'playing') return;
   if (isDropdownOpen()) return;
 

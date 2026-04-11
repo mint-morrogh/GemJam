@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
 
-export default defineConfig({
-  base: '/GemJam/',
-});
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/GemJam/' : '/',
+}));
