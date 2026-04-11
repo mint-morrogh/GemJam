@@ -59,6 +59,13 @@ let rawDpr = dpr;
 export function refreshDpr(virtualWidth?: number, virtualHeight?: number): void {
   rawDpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
 
+  // On desktop (DPR 1), calculate how much the canvas is being stretched
+  // and use at least that ratio so text/sprites aren't fuzzy
+  if (rawDpr <= 1 && typeof window !== 'undefined') {
+    const cssScale = Math.min(window.innerHeight / (virtualHeight || 960), window.innerWidth / (virtualWidth || 480));
+    if (cssScale > 1) rawDpr = Math.min(cssScale, maxDpr);
+  }
+
   // Apply cap
   let effective = Math.min(rawDpr, maxDpr);
 
