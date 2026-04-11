@@ -75,7 +75,7 @@ export function computeTrajectory(
   gemRadius: number,
   tier = 0,
   maxSteps = 300,
-  maxBounces = 3,
+  maxBounces = 8,
 ): TrajectoryPoint[] {
   const points: TrajectoryPoint[] = [{ x: startX, y: startY }];
   let x = startX;
@@ -122,8 +122,7 @@ export function computeTrajectory(
       bounces++;
     }
 
-    // Record every other point to keep array manageable
-    if (i % 2 === 0) points.push({ x, y });
+    points.push({ x, y });
 
     if (bounces >= maxBounces) break;
     if (Math.abs(vx) < 0.01 && Math.abs(vy) < 0.01 && y + gemRadius >= wallBottom - 1) break;

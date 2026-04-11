@@ -115,12 +115,12 @@ export interface GridConfig {
 
 // -- Container dimensions (centered in virtual viewport) --------------------
 
-const CONTAINER_WIDTH = IS_PORTRAIT ? 440 : 420;
-const CONTAINER_HEIGHT = IS_PORTRAIT ? 770 : 580;
+const CONTAINER_WIDTH = IS_PORTRAIT ? 472 : 450;
+const CONTAINER_HEIGHT = IS_PORTRAIT ? 720 : 540;
 const CONTAINER_X = (VIRTUAL_WIDTH - CONTAINER_WIDTH) / 2;
 const CONTAINER_Y = IS_PORTRAIT
-  ? 115 // below top-nav (40px) + launcher zone; bucket fills ~80% of screen
-  : 100; // below nav in landscape
+  ? 200 // below top-nav (40px) + next-gem strip (55px) + launcher zone
+  : 170; // below nav + strip in landscape
 const DROP_Y = CONTAINER_Y - 30; // gem preview sits above the container
 const COLUMN_COUNT = 7;
 const COLUMN_WIDTH = CONTAINER_WIDTH / COLUMN_COUNT;

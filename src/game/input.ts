@@ -1,6 +1,22 @@
 import { screenToVirtual } from '../canvas';
 
 // ---------------------------------------------------------------------------
+// Fire mode setting (persisted)
+// ---------------------------------------------------------------------------
+
+export type FireMode = 'multitap' | 'holdrelease';
+
+let fireMode: FireMode = (() => {
+  try { return (localStorage.getItem('gemjam_firemode') as FireMode) || 'multitap'; } catch { return 'multitap'; }
+})();
+
+export function getFireMode(): FireMode { return fireMode; }
+export function setFireMode(mode: FireMode): void {
+  fireMode = mode;
+  try { localStorage.setItem('gemjam_firemode', mode); } catch { /* */ }
+}
+
+// ---------------------------------------------------------------------------
 // Aim state — read each frame by the renderer for trajectory drawing
 // ---------------------------------------------------------------------------
 
@@ -78,8 +94,8 @@ export function createInputHandler(canvas: HTMLCanvasElement): InputHandler {
       aim.x = vp.x;
       aim.y = vp.y;
       aim.active = true;
-    } else {
-      // Second finger while aiming → FIRE (keep aiming with first finger)
+    } else if (fireMode === 'multitap') {
+      // Multi-tap: second finger fires (keep aiming with first finger)
       onFire?.(aim.x, aim.y);
     }
   }
@@ -105,7 +121,10 @@ export function createInputHandler(canvas: HTMLCanvasElement): InputHandler {
 
     for (let i = 0; i < e.changedTouches.length; i++) {
       if (e.changedTouches[i].identifier === aimTouchId) {
-        // Aiming finger lifted → cancel aim (don't fire)
+        if (fireMode === 'holdrelease') {
+          // Hold & release: lifting the aiming finger fires
+          onFire?.(aim.x, aim.y);
+        }
         aimTouchId = null;
         aim.active = false;
         return;

@@ -22,7 +22,7 @@ export interface RunStats {
   maxCombo: number;
 }
 
-export const GEM_QUEUE_DEPTH = 4;
+export const GEM_QUEUE_DEPTH = 7;
 
 export interface GameState {
   columns: PlacedGem[][];
@@ -122,8 +122,9 @@ export function resetGameState(state: GameState): void {
 
 // -- Overflow detection -------------------------------------------------------
 
-/** Speed threshold — only nearly-settled gems trigger overflow/danger. */
-const SETTLED_SPEED = 60;
+/** Speed threshold — gems slower than this trigger overflow/danger.
+ *  Lower = stricter (only fully resting), higher = catches slow-rolling gems too. */
+const SETTLED_SPEED = 120;
 
 export function checkOverflow(world: World): boolean {
   const bodies = dynamicBodies(world);

@@ -12,7 +12,7 @@ import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT, IS_PORTRAIT } from '../canvas';
 // ---------------------------------------------------------------------------
 
 const BASE_POINTS = 6000;
-const SCALE_FACTOR = 1.5;
+const SCALE_FACTOR = 1.3;
 
 /** Get cumulative score needed to reach the given level (1-indexed). */
 function thresholdForLevel(level: number): number {

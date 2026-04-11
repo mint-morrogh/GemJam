@@ -33,12 +33,13 @@ interface FloatingText {
   lifetime: number;
   color: string;
   fontSize: number;
+  rainbow: boolean;
 }
 
 const floats: FloatingText[] = [];
 
 export function spawnFloatingLabel(x: number, y: number, text: string, color: string, lifetime = 1.0, fontSize = 14): void {
-  floats.push({ x, y, text, age: 0, lifetime, color, fontSize });
+  floats.push({ x, y, text, age: 0, lifetime, color, fontSize, rainbow: false });
 }
 
 export function spawnGoldText(x: number, y: number, amount: number): void {
@@ -49,20 +50,22 @@ export function spawnGoldText(x: number, y: number, amount: number): void {
     lifetime: 0.8,
     color: '#FBBF24',
     fontSize: 14,
+    rainbow: false,
   });
 }
 
 export function spawnScoreText(x: number, y: number, points: number, combo: number): void {
   const size = Math.min(32, 13 + combo * 3);
-  const color = combo >= 5 ? '#FF6B6B' : combo >= 3 ? '#FBBF24' : '#ffffff';
+  const isRainbow = combo >= 5;
   const comboStr = combo >= 2 ? ` x${combo}` : '';
   floats.push({
     x, y,
     text: `+${points.toLocaleString()} SCORE${comboStr}`,
     age: 0,
     lifetime: 0.7 + Math.min(combo * 0.1, 0.5),
-    color,
+    color: '#ffffff',
     fontSize: size,
+    rainbow: isRainbow,
   });
 }
 
@@ -97,7 +100,13 @@ export function drawFloatingText(ctx: CanvasRenderingContext2D): void {
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
     ctx.fillText(f.text, f.x + 1, f.y + 1);
 
-    ctx.fillStyle = f.color;
+    if (f.rainbow) {
+      // Cycling rainbow hue
+      const hue = ((f.age * 360) + f.x) % 360;
+      ctx.fillStyle = `hsl(${hue}, 100%, 70%)`;
+    } else {
+      ctx.fillStyle = f.color;
+    }
     ctx.fillText(f.text, f.x, f.y);
   }
   ctx.restore();
@@ -157,9 +166,11 @@ function rollRarity(): Rarity {
 interface ShopItemDef {
   id: string;
   name: string;
+  /** Optional color for the item name (e.g. red for Garnet). */
+  nameColor?: string;
   description: (pct: number) => string;
-  basePct: number;   // base % effect at common
-  baseCost: number;   // base gold cost at common
+  basePct: number;
+  baseCost: number;
   apply: (pct: number) => void;
 }
 
@@ -178,6 +189,7 @@ const ITEM_DEFS: ShopItemDef[] = [
   {
     id: 'garnet_chance',
     name: 'Garnet Finder',
+    nameColor: '#DC2626',
     description: (pct) => `+${pct.toFixed(1)}% garnet in launcher`,
     basePct: 1,
     baseCost: 120,
@@ -553,7 +565,7 @@ export function drawShop(ctx: CanvasRenderingContext2D): void {
 
       // Item name
       ctx.font = `bold 11px monospace`;
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = item.def.nameColor ?? '#ffffff';
       ctx.fillText(item.def.name, cx + CARD_W / 2, cy + 32);
 
       // Description (word-wrapped)

@@ -46,15 +46,13 @@ const TOP_NAV_H = 40;
 // Bottom next-gem strip layout
 // ---------------------------------------------------------------------------
 
-const BOTTOM_STRIP_H = 55;
-const BOTTOM_STRIP_Y = IS_PORTRAIT
-  ? GRID.containerY + GRID.containerHeight + 10
-  : GRID.containerY + GRID.containerHeight + 8;
-const BOTTOM_STRIP_X = GRID.containerX;
-const BOTTOM_STRIP_W = GRID.containerWidth;
+const STRIP_H = 55;
+const STRIP_Y = 42; // right below the top nav
+const STRIP_X = GRID.containerX;
+const STRIP_W = GRID.containerWidth;
 /** Horizontal spacing between gem centers in the bottom strip. */
-const GEM_SLOT_SPACING = IS_PORTRAIT ? 70 : 65;
-const GEM_SLOT_COUNT = 4;
+const GEM_SLOT_SPACING = IS_PORTRAIT ? 68 : 60;
+const GEM_SLOT_COUNT = 5;
 
 // ---------------------------------------------------------------------------
 // Board styling — dark arcade palette (BookBreaker-inspired)
@@ -85,78 +83,16 @@ export function drawBoard(ctx: CanvasRenderingContext2D): void {
 
   const R4 = [BUCKET_TOP_R, BUCKET_TOP_R, BUCKET_BOT_R, BUCKET_BOT_R] as const;
 
-  // -- Outer glow (soft diffuse halo) ---------------------------------------
-  ctx.save();
-  ctx.shadowColor = 'rgba(100, 160, 220, 0.06)';
-  ctx.shadowBlur = 50;
+  // -- Minimal well: dark fill + single border stroke -------------------------
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, R4);
-  ctx.fillStyle = 'rgba(8, 12, 20, 0.4)';
-  ctx.fill();
-  ctx.restore();
-
-  // -- Glass interior (barely-there blue tint) ------------------------------
-  ctx.beginPath();
-  ctx.roundRect(x, y, w, h, R4);
-  ctx.fillStyle = 'rgba(60, 100, 160, 0.02)';
+  ctx.fillStyle = 'rgba(8, 12, 20, 0.35)';
   ctx.fill();
 
-  // == Clipped interior effects ================================================
-  ctx.save();
+  // Single clean border
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, R4);
-  ctx.clip();
-
-  // -- Left edge specular line ------------------------------------------------
-  const edgeGrad = ctx.createLinearGradient(x, y + h * 0.1, x, y + h * 0.7);
-  edgeGrad.addColorStop(0, 'rgba(220, 240, 255, 0)');
-  edgeGrad.addColorStop(0.15, 'rgba(220, 240, 255, 0.15)');
-  edgeGrad.addColorStop(0.5, 'rgba(220, 240, 255, 0.1)');
-  edgeGrad.addColorStop(1, 'rgba(220, 240, 255, 0)');
-  ctx.strokeStyle = edgeGrad;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(x + 1, y + h * 0.08);
-  ctx.lineTo(x + 1, y + h * 0.72);
-  ctx.stroke();
-
-  // -- Right edge specular line (fainter) -------------------------------------
-  const edgeGradR = ctx.createLinearGradient(x, y + h * 0.15, x, y + h * 0.6);
-  edgeGradR.addColorStop(0, 'rgba(200, 225, 250, 0)');
-  edgeGradR.addColorStop(0.2, 'rgba(200, 225, 250, 0.06)');
-  edgeGradR.addColorStop(0.5, 'rgba(200, 225, 250, 0.04)');
-  edgeGradR.addColorStop(1, 'rgba(200, 225, 250, 0)');
-  ctx.strokeStyle = edgeGradR;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(x + w - 1, y + h * 0.12);
-  ctx.lineTo(x + w - 1, y + h * 0.62);
-  ctx.stroke();
-
-  // -- Interior floor vignette (soft darkening at base) -----------------------
-  const floorDark = ctx.createLinearGradient(x, y + h - 80, x, y + h);
-  floorDark.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  floorDark.addColorStop(1, 'rgba(0, 0, 0, 0.1)');
-  ctx.fillStyle = floorDark;
-  ctx.fillRect(x, y + h - 80, w, 80);
-
-  ctx.restore(); // remove clip
-
-  // -- Outer border (single clean line) -------------------------------------
-  ctx.beginPath();
-  ctx.roundRect(x, y, w, h, R4);
-  ctx.strokeStyle = 'rgba(140, 180, 230, 0.12)';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // -- Inner highlight stroke (glass thickness) -----------------------------
-  const R4i = [
-    Math.max(0, BUCKET_TOP_R - 2), Math.max(0, BUCKET_TOP_R - 2),
-    Math.max(0, BUCKET_BOT_R - 2), Math.max(0, BUCKET_BOT_R - 2),
-  ];
-  ctx.beginPath();
-  ctx.roundRect(x + 2, y + 2, w - 4, h - 4, R4i);
-  ctx.strokeStyle = 'rgba(120, 170, 225, 0.04)';
+  ctx.strokeStyle = 'rgba(160, 200, 245, 0.25)';
   ctx.lineWidth = 1;
   ctx.stroke();
 }
@@ -291,31 +227,30 @@ export function drawTrajectory(
   ctx.setLineDash([dashLen, gapLen]);
   ctx.lineDashOffset = -(time * speed) % (dashLen + gapLen);
 
-  // Draw trajectory fading out gradually — fully gone by ~35% of total length
-  const cutoff = Math.floor(points.length * 0.35);
-  if (cutoff < 2) { ctx.restore(); return; }
+  // Draw trajectory as one continuous dashed path (no fade breaks)
+  const cutoff = Math.max(25, Math.floor(points.length * 0.28));
+  const total = Math.min(cutoff, points.length - 1);
+  if (total < 3) { ctx.restore(); return; }
 
-  const BATCHES = 10;
-  const batchSize = Math.max(1, Math.floor(cutoff / BATCHES));
-  for (let b = 0; b < BATCHES; b++) {
-    const start = b * batchSize;
-    const end = Math.min(start + batchSize, cutoff);
-    if (start >= end) break;
-    const t = b / BATCHES; // 0 → 1 over the visible portion
-    const alpha = 0.45 * (1 - t); // linear fade from 0.45 → 0
-    const width = 2.5 - t * 1.2;  // 2.5 → 1.3
-    if (alpha < 0.01) break;
-
-    ctx.beginPath();
-    ctx.moveTo(points[start].x, points[start].y);
-    for (let i = start + 1; i <= end; i++) {
+  // Single continuous smooth dashed path — uniform opacity, no fade
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < total; i++) {
+    if (i < total - 1) {
+      const mx = (points[i].x + points[i + 1].x) / 2;
+      const my = (points[i].y + points[i + 1].y) / 2;
+      ctx.quadraticCurveTo(points[i].x, points[i].y, mx, my);
+    } else {
       ctx.lineTo(points[i].x, points[i].y);
     }
-    ctx.strokeStyle = '#ffffff';
-    ctx.globalAlpha = alpha;
-    ctx.lineWidth = width;
-    ctx.stroke();
   }
+
+  ctx.strokeStyle = '#ffffff';
+  ctx.globalAlpha = 0.35;
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
 
   ctx.setLineDash([]);
   ctx.restore();
@@ -426,10 +361,10 @@ function drawStripGem(
  * Glass-style background, gems with glow, arrow flow indicators.
  */
 export function drawNextGemPanel(ctx: CanvasRenderingContext2D, queue: readonly { def: GemDef; heavy: boolean; bonus: boolean; blackhole: boolean }[]): void {
-  const sx = BOTTOM_STRIP_X;
-  const sy = BOTTOM_STRIP_Y;
-  const sw = BOTTOM_STRIP_W;
-  const sh = BOTTOM_STRIP_H;
+  const sx = STRIP_X;
+  const sy = STRIP_Y;
+  const sw = STRIP_W;
+  const sh = STRIP_H;
   const R = 14;
   const centerY = sy + sh / 2;
 
@@ -460,40 +395,15 @@ export function drawNextGemPanel(ctx: CanvasRenderingContext2D, queue: readonly 
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  // -- "NEXT" label with subtle styling --------------------------------------
-  ctx.save();
-  ctx.font = `bold ${IS_PORTRAIT ? 10 : 9}px monospace`;
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('N', sx + 18, centerY - 12);
-  ctx.fillText('E', sx + 18, centerY - 2);
-  ctx.fillText('X', sx + 18, centerY + 8);
-  ctx.fillText('T', sx + 18, centerY + 18);
-  ctx.restore();
-
-  // Subtle divider
-  ctx.save();
-  const divGrad = ctx.createLinearGradient(sx + 34, sy + 8, sx + 34, sy + sh - 8);
-  divGrad.addColorStop(0, 'rgba(140, 180, 230, 0)');
-  divGrad.addColorStop(0.5, 'rgba(140, 180, 230, 0.1)');
-  divGrad.addColorStop(1, 'rgba(140, 180, 230, 0)');
-  ctx.strokeStyle = divGrad;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(sx + 34, sy + 8);
-  ctx.lineTo(sx + 34, sy + sh - 8);
-  ctx.stroke();
-  ctx.restore();
 
   // -- Gem slots (animated) ---------------------------------------------------
   ctx.save();
   ctx.beginPath();
-  ctx.roundRect(sx + 36, sy, sw - 36, sh, [0, R, R, 0]);
+  ctx.roundRect(sx, sy, sw, sh, R);
   ctx.clip();
 
-  const gemAreaStart = sx + 50;
-  const gemAreaWidth = sw - 50 - 15;
+  const gemAreaStart = sx + 20;
+  const gemAreaWidth = sw - 40;
   const animating = queueAnim.active;
   const t = animating ? 1 - (1 - queueAnim.progress) * (1 - queueAnim.progress) : 1;
   const slideOffset = (1 - t) * GEM_SLOT_SPACING;
@@ -505,7 +415,7 @@ export function drawNextGemPanel(ctx: CanvasRenderingContext2D, queue: readonly 
   for (let i = 0; i < GEM_SLOT_COUNT - 1; i++) {
     const arrowX = firstSlotX + (i + 0.5) * GEM_SLOT_SPACING + slideOffset;
     ctx.save();
-    ctx.globalAlpha = 0.12;
+    ctx.globalAlpha = 0.3;
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.moveTo(arrowX + 4, centerY - 4);
@@ -712,7 +622,7 @@ export function drawDangerZone(
     ctx.fill();
 
     // Remaining time bar (red → orange → green)
-    const barColor = remaining > 0.5 ? '#f87171' : remaining > 0.25 ? '#FF6B2D' : '#22C55E';
+    const barColor = remaining > 0.5 ? '#22C55E' : remaining > 0.25 ? '#FF6B2D' : '#f87171';
     ctx.fillStyle = barColor;
     ctx.beginPath();
     ctx.roundRect(barX, barY, barW * remaining, barH, 4);
@@ -777,7 +687,7 @@ export function drawScoreHUD(
   ctx.fillText(scoring.score.toLocaleString(), 15, valueY);
 
   // -- Left-center: GOLD ------------------------------------------------------
-  const goldX = IS_PORTRAIT ? 150 : 140;
+  const goldX = IS_PORTRAIT ? 115 : 110;
   ctx.font = `bold 9px monospace`;
   ctx.fillStyle = '#6b7280';
   ctx.textAlign = 'left';
@@ -975,7 +885,7 @@ export function drawGameOverSummary(
   const divider2Y = panelY + 270;
   const hsY = divider2Y + 18;
   const lbStartY = panelY + 330;
-  const btnY = panelY + panelH - BTN_H - 20;
+  const btnY = panelY + panelH - BTN_H - 12;
 
   // -- Element 0: "GAME OVER" ------------------------------------------------
   const a0 = elAlpha(0);
@@ -1100,7 +1010,8 @@ export function drawGameOverSummary(
     ctx.fillText('TOP SCORES', cx, lbStartY);
 
     const rowH = 17;
-    for (let i = 0; i < history.length; i++) {
+    const maxScores = Math.min(history.length, 5);
+    for (let i = 0; i < maxScores; i++) {
       const entry = history[i];
       const rowY = lbStartY + 16 + i * rowH;
       const isCurrent = i === rank;

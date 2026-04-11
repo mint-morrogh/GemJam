@@ -75,6 +75,21 @@ export function comboMultiplierFor(comboCount: number): number {
   return BASE_MULTIPLIER;
 }
 
+/** Gold combo multiplier — gentler curve than score. */
+const GOLD_COMBO_THRESHOLDS: readonly [number, number][] = [
+  [10, 2.0],
+  [7,  1.8],
+  [5,  1.5],
+  [3,  1.2],
+] as const;
+
+export function goldComboMultiplierFor(comboCount: number): number {
+  for (const [threshold, multiplier] of GOLD_COMBO_THRESHOLDS) {
+    if (comboCount >= threshold) return multiplier;
+  }
+  return 1;
+}
+
 /**
  * Register a merge event at the given elapsed game time.
  * Increments combo if within getComboWindow() of the last merge, otherwise resets to 1.

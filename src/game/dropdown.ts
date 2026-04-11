@@ -5,6 +5,7 @@
 import { VIRTUAL_WIDTH, IS_PORTRAIT } from '../canvas';
 import { getAutoShakeMobile, setAutoShakeMobile } from './levelShake';
 import { getActiveUpgrades } from './shop';
+import { getFireMode, setFireMode } from './input';
 
 const IS_MOBILE = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
@@ -13,23 +14,39 @@ const IS_MOBILE = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 // ---------------------------------------------------------------------------
 
 const NAV_H = 40;
-const BASE_PANEL_H = IS_PORTRAIT ? 240 : 190;
 const UPGRADE_ROW_H = 16;
 const ANIM_DUR = 0.25;
-
-/** Dynamic panel height based on active upgrades count. */
-function getPanelH(): number {
-  const ups = getActiveUpgrades();
-  if (ups.length === 0) return BASE_PANEL_H;
-  return BASE_PANEL_H + 20 + ups.length * UPGRADE_ROW_H + 10;
-}
 
 const BTN_W = IS_PORTRAIT ? 200 : 180;
 const BTN_H = IS_PORTRAIT ? 44 : 38;
 const BTN_X = (VIRTUAL_WIDTH - BTN_W) / 2;
 
-function getRestartBtnY(): number { return NAV_H + getPanelH() - BTN_H - 20; }
-function getToggleY(): number { return getRestartBtnY() - BTN_H - 12; }
+/** Compute total panel height based on content. */
+function getPanelH(): number {
+  const ups = getActiveUpgrades();
+  // Stats rows: 4 rows × 28px + top padding
+  let h = 22 + 4 * 28;
+  // Upgrade card if any
+  if (ups.length > 0) {
+    h += 14; // gap before card
+    h += 24 + ups.length * UPGRADE_ROW_H + 10; // card content
+    h += 20; // gap after card
+  }
+  // Toggle buttons (mobile): auto-shake + fire mode
+  if (IS_MOBILE) {
+    h += (BTN_H + 10) * 2 + 6;
+  }
+  // Restart button
+  h += BTN_H + 20;
+  return h;
+}
+
+/** These are computed during draw since they depend on content flow. */
+let _toggleY = 0;
+let _fireModeY = 0;
+let _restartBtnY = 0;
+function getRestartBtnY(): number { return _restartBtnY; }
+function getToggleY(): number { return _toggleY; }
 
 // ---------------------------------------------------------------------------
 // State
@@ -95,6 +112,20 @@ export function isClickOnAutoShake(vx: number, vy: number): boolean {
 export function handleAutoShakeToggle(vx: number, vy: number): boolean {
   if (!isClickOnAutoShake(vx, vy)) return false;
   setAutoShakeMobile(!getAutoShakeMobile());
+  return true;
+}
+
+/** Check if click hits the fire mode toggle. */
+export function isClickOnFireMode(vx: number, vy: number): boolean {
+  if (!IS_MOBILE || ds.progress < 0.9) return false;
+  return vx >= BTN_X && vx <= BTN_X + BTN_W &&
+    vy >= _fireModeY && vy <= _fireModeY + BTN_H;
+}
+
+/** Handle fire mode toggle click. Returns true if handled. */
+export function handleFireModeToggle(vx: number, vy: number): boolean {
+  if (!isClickOnFireMode(vx, vy)) return false;
+  setFireMode(getFireMode() === 'multitap' ? 'holdrelease' : 'multitap');
   return true;
 }
 
@@ -172,45 +203,60 @@ export function drawDropdown(
     rowY += rowH;
   }
 
-  // -- Active upgrades list --
+  // -- Active upgrades section (card-style panel) --
   const upgrades = getActiveUpgrades();
   if (upgrades.length > 0) {
-    rowY += 8;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(labelX, rowY);
-    ctx.lineTo(valueX, rowY);
-    ctx.stroke();
-    rowY += 10;
-
-    ctx.font = `bold 9px monospace`;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.textAlign = 'left';
-    ctx.fillText('UPGRADES', labelX, rowY);
     rowY += 14;
 
+    const cardX = labelX - 10;
+    const cardW = valueX - labelX + 20;
+    const cardPadTop = 24;
+    const cardPadBot = 10;
+    const cardH = cardPadTop + upgrades.length * UPGRADE_ROW_H + cardPadBot;
+    const cardR = 10;
+
+    // Card background
+    ctx.beginPath();
+    ctx.roundRect(cardX, rowY, cardW, cardH, cardR);
+    ctx.fillStyle = 'rgba(20, 28, 42, 0.6)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(100, 140, 200, 0.1)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Header
+    ctx.font = `bold 9px monospace`;
+    ctx.fillStyle = 'rgba(125, 211, 252, 0.5)';
+    ctx.textAlign = 'left';
+    ctx.fillText('UPGRADES', labelX, rowY + 14);
+
+    // Upgrade rows inside the card
+    let upY = rowY + cardPadTop + 4;
     for (const up of upgrades) {
       ctx.font = `10px monospace`;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
       ctx.textAlign = 'left';
-      ctx.fillText(up.name, labelX, rowY);
+      ctx.fillText(up.name, labelX, upY);
 
       ctx.font = `bold 10px monospace`;
       ctx.fillStyle = '#7dd3fc';
       ctx.textAlign = 'right';
-      ctx.fillText(up.value, valueX, rowY);
+      ctx.fillText(up.value, valueX, upY);
 
-      rowY += UPGRADE_ROW_H;
+      upY += UPGRADE_ROW_H;
     }
+
+    rowY += cardH + 10;
   }
 
-  // -- Auto-shake toggle (mobile only) --
+  // -- Auto-shake toggle (mobile only) — flows after content --
   if (IS_MOBILE) {
+    rowY += 6;
+    _toggleY = rowY;
     const btnR = 8;
     const isAuto = getAutoShakeMobile();
     ctx.beginPath();
-    ctx.roundRect(BTN_X, getToggleY(), BTN_W, BTN_H, btnR);
+    ctx.roundRect(BTN_X, rowY, BTN_W, BTN_H, btnR);
     ctx.fillStyle = isAuto ? 'rgba(80, 200, 120, 0.15)' : 'rgba(100, 120, 150, 0.1)';
     ctx.fill();
     ctx.strokeStyle = isAuto ? 'rgba(80, 200, 120, 0.4)' : 'rgba(100, 120, 150, 0.25)';
@@ -221,14 +267,35 @@ export function drawDropdown(
     ctx.fillStyle = isAuto ? '#4ade80' : '#6b7280';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`AUTO-SHAKE: ${isAuto ? 'ON' : 'OFF'}`, VIRTUAL_WIDTH / 2, getToggleY() + BTN_H / 2);
+    ctx.fillText(`AUTO-SHAKE: ${isAuto ? 'ON' : 'OFF'}`, VIRTUAL_WIDTH / 2, rowY + BTN_H / 2);
+    rowY += BTN_H + 10;
+
+    // -- Fire mode toggle (mobile only) --
+    _fireModeY = rowY;
+    const isHold = getFireMode() === 'holdrelease';
+    ctx.beginPath();
+    ctx.roundRect(BTN_X, rowY, BTN_W, BTN_H, btnR);
+    ctx.fillStyle = isHold ? 'rgba(100, 140, 220, 0.15)' : 'rgba(100, 120, 150, 0.1)';
+    ctx.fill();
+    ctx.strokeStyle = isHold ? 'rgba(100, 140, 220, 0.4)' : 'rgba(100, 120, 150, 0.25)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.font = `bold ${IS_PORTRAIT ? 12 : 10}px monospace`;
+    ctx.fillStyle = isHold ? '#7dd3fc' : '#6b7280';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`FIRE: ${isHold ? 'HOLD & RELEASE' : 'MULTI-TAP'}`, VIRTUAL_WIDTH / 2, rowY + BTN_H / 2);
+    rowY += BTN_H + 10;
   }
 
-  // -- Restart button --
+  // -- Restart button — always last --
   {
+    rowY += 4;
+    _restartBtnY = rowY;
     const btnR = 8;
     ctx.beginPath();
-    ctx.roundRect(BTN_X, getRestartBtnY(), BTN_W, BTN_H, btnR);
+    ctx.roundRect(BTN_X, rowY, BTN_W, BTN_H, btnR);
     ctx.fillStyle = 'rgba(220, 38, 38, 0.15)';
     ctx.fill();
     ctx.strokeStyle = 'rgba(220, 38, 38, 0.4)';
@@ -239,7 +306,7 @@ export function drawDropdown(
     ctx.fillStyle = '#f87171';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('RESTART GAME', VIRTUAL_WIDTH / 2, getRestartBtnY() + BTN_H / 2);
+    ctx.fillText('RESTART GAME', VIRTUAL_WIDTH / 2, rowY + BTN_H / 2);
   }
 
   ctx.restore(); // remove clip

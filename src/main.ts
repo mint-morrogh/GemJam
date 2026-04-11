@@ -13,7 +13,7 @@ import { updateAndDrawMergeAnimations, resetMergeAnimations, getScreenShake } fr
 import { resetMergeQueue } from './game/mergeDetector';
 import { particles, detectLandings, resetLandingTracker, updateGemSparkles } from './game/particles';
 import { setOnMerge } from './game/mergeExecutor';
-import { createScoringState, awardMergePoints, registerMerge, updateCombo, BASE_MULTIPLIER, loadHighScore, saveHighScore, recordScore } from './game/scoring';
+import { createScoringState, awardMergePoints, registerMerge, updateCombo, goldComboMultiplierFor, BASE_MULTIPLIER, loadHighScore, saveHighScore, recordScore } from './game/scoring';
 import type { ScoreEntry } from './game/scoring';
 import { createLauncherState, getLaunchVelocity, computeTrajectory } from './game/launcher';
 import { loadSettings, getSettings } from './game/settings';
@@ -23,7 +23,7 @@ import { autoDetectQuality, feedFrameTime, updateTransition, shouldRenderEffects
 import { getBoardCache } from './game/boardCache';
 import { writeSave, readSave, clearSave } from './game/persistence';
 import { initShakeDetection, checkLevelUp, updateLevelShake, getShakeGravity, getShakePhase, getCurrentLevel, pointsToNextLevel, getLidProgress, resetLevelShake, setLevel, closeShopPhase, drawLevelOverlay } from './game/levelShake';
-import { isDropdownOpen, toggleDropdown, closeDropdown, updateDropdown, isClickInNav, isClickOnRestart, isClickOnBackdrop, handleAutoShakeToggle, drawDropdown } from './game/dropdown';
+import { isDropdownOpen, toggleDropdown, closeDropdown, updateDropdown, isClickInNav, isClickOnRestart, isClickOnBackdrop, handleAutoShakeToggle, handleFireModeToggle, drawDropdown } from './game/dropdown';
 import { getGold, addGold, goldForTier, spawnGoldText, spawnScoreText, spawnFloatingLabel, updateFloatingText, drawFloatingText, openShop, closeShop, clearShopForNextLevel, isShopOpen, buyItem, rerollShop, getShopClickIndex, isClickOnContinue, isClickOnReroll, drawShop, resetShop, getShopSaveData, restoreShopData } from './game/shop';
 import { setOnBlackhole, resetBlackholeTracker, updateBlackholes, drawActiveBlackholes } from './game/blackhole';
 import type { SaveData, GemSnapshot } from './game/persistence';
@@ -94,23 +94,28 @@ setOnMerge((resultTier, _rainbow, midX, midY, bonusMerge, tierSkipped, bonusGemS
   }
 
   // Gold reward (spaced below score text)
-  const goldAmt = goldForTier(scoreTier) * (bonusMerge ? 5 : 1);
+  const goldComboMult = goldComboMultiplierFor(combo);
+  const goldAmt = Math.round(goldForTier(scoreTier) * (bonusMerge ? 5 : 1) * goldComboMult);
   addGold(goldAmt);
   spawnGoldText(midX, midY - gemR - 8, goldAmt);
 
-  // Tier skip announcement
+  // Special event announcements — stacked above score/gold text
+  // Score is at gemR+28, gold at gemR+8, so events start at gemR+48 and stack up
+  let eventOffset = gemR + 48;
+
   if (tierSkipped) {
-    spawnFloatingLabel(midX, midY - 50, 'TIER SKIP!', '#67E8F9', 1.2);
+    spawnFloatingLabel(midX, midY - eventOffset, 'TIER SKIP!', '#67E8F9', 1.2, 16);
+    eventOffset += 18;
   }
 
-  // Bonus gem spawn announcement
   if (bonusGemSpawned) {
-    spawnFloatingLabel(midX, midY - 65, 'BONUS GEM!', '#4ADE80', 1.2);
+    spawnFloatingLabel(midX, midY - eventOffset, 'BONUS GEM!', '#4ADE80', 1.2, 16);
+    eventOffset += 18;
   }
 
-  // Explosion announcement
   if (exploded) {
-    spawnFloatingLabel(midX, midY - 80, 'BOOM!', '#FF6B2D', 1.0);
+    spawnFloatingLabel(midX, midY - eventOffset, 'BOOM!', '#FF6B2D', 1.0, 18);
+    eventOffset += 18;
   }
 
   // Track run stats
@@ -253,9 +258,11 @@ window.addEventListener('beforeunload', () => {
 });
 
 // -- Resume on tap / click (capture phase — consumed before input handler) --
+let resumeCooldown = 0;
 function handleResume(e: Event): void {
   if (!paused) return;
   paused = false;
+  resumeCooldown = 0.3; // block firing for 300ms after resume
   e.stopImmediatePropagation();
   e.preventDefault();
 }
@@ -331,6 +338,7 @@ function handleMenuClick(clientX: number, clientY: number): void {
   if (isDropdownOpen()) {
     // Auto-shake toggle
     if (handleAutoShakeToggle(vp.x, vp.y)) return;
+    if (handleFireModeToggle(vp.x, vp.y)) return;
     // Restart button
     if (isClickOnRestart(vp.x, vp.y)) {
       closeDropdown();
@@ -364,6 +372,8 @@ const input = createInputHandler(canvas);
 input.onFire = (aimX, aimY) => {
   if (state.gameOver) return;
   if (fireCooldown > 0) return;
+  if (resumeCooldown > 0) return;
+  if (overflowTimer > 0) return; // can't fire while countdown is active
   if (getShakePhase() !== 'playing') return;
   if (isDropdownOpen()) return;
 
@@ -395,6 +405,7 @@ startLoop({
     if (paused) return;
     elapsedTime += _dt;
     fireCooldown = Math.max(0, fireCooldown - _dt);
+    resumeCooldown = Math.max(0, resumeCooldown - _dt);
 
     // Level interlude state machine
     checkLevelUp(scoring.score);
@@ -490,6 +501,7 @@ startLoop({
       if (overflowTimer >= OVERFLOW_GRACE) {
         state.gameOver = true;
         clearSave();
+        resetShop(); // wipe all upgrades immediately — no lingering via blur/save
         isNewHighScore = saveHighScore(scoring);
         const result = recordScore(scoring);
         gameOverHistory = result.history;
@@ -518,7 +530,7 @@ startLoop({
     // Board background — blit from offscreen cache
     ctx.drawImage(getBoardCache(), 0, 0);
 
-    drawNextGemPanel(ctx, state.gemQueue);
+    drawNextGemPanel(ctx, state.gemQueue.slice(1));
     drawScoreHUD(ctx, scoring, getCurrentLevel(), pointsToNextLevel(scoring.score, getCurrentLevel()), getGold());
 
     // Danger zone indicator at top of container

@@ -1,5 +1,7 @@
 # GemJam
 
+### [Play GemJam](https://mint-morrogh.github.io/GemJam/)
+
 A merge-based physics puzzle game for mobile and desktop browsers. Drop, aim, and fire gems into a glass well — match two of the same tier to merge them into a bigger, more valuable gem. Chase high scores across escalating levels with a shake mechanic that literally rattles the entire well between rounds.
 
 ## Play
