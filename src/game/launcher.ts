@@ -82,7 +82,7 @@ export function computeTrajectory(
   let y = startY;
 
   // Planck-matched physics (pixels/second units, Euler integration)
-  const t = tier / 11;
+  const t = tier / 10;
   const linearDamping = 0.8 - t * 0.5;       // mirrors gemSpawner
   const bounceRestitution = Math.max(0.5 - t * 0.3, 0.2);
 

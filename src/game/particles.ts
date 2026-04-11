@@ -364,7 +364,7 @@ export function updateGemSparkles(
   for (const body of bodies) {
     if (body.isStatic()) continue;
     const data = getGemData(body);
-    if (!data || data.tier < 4) continue; // tier 4+ (garnet and up) — gems only, not rocks
+    if (!data || data.tier < 3) continue; // tier 3+ (aqua and up)
     if (bodySpeed(body) > 3) continue;
 
     const def = GEM_TIERS[data.tier];

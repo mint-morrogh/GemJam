@@ -27,7 +27,7 @@ export function resetMergeQueue(): void {
   pendingBodies.clear();
 }
 
-const MAX_TIER = 11;
+const MAX_TIER = 10;
 
 // ---------------------------------------------------------------------------
 // Collision listener

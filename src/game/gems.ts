@@ -42,18 +42,17 @@ export interface Gem {
  * progression through all tiers. Two rainbow tier-11 → gems disappear.
  */
 export const GEM_TIERS: readonly GemDef[] = [
-  { id: 0,  type: 'pebble',      color: '#C0B8A8', radius: 24, points: 2     },
-  { id: 1,  type: 'ore',         color: '#A0A0A0', radius: 29, points: 5     },
-  { id: 2,  type: 'geode',       color: '#8899AA', radius: 35, points: 12    },
-  { id: 3,  type: 'cluster',     color: '#88BBCC', radius: 42, points: 30    },
-  { id: 4,  type: 'garnet',      color: '#DC2626', radius: 50, points: 80    },
-  { id: 5,  type: 'sapphire',    color: '#2563EB', radius: 60, points: 200   },
-  { id: 6,  type: 'emerald',     color: '#50C878', radius: 72, points: 500   },
-  { id: 7,  type: 'topaz',       color: '#F5C542', radius: 86, points: 1200  },
-  { id: 8,  type: 'amethyst',    color: '#9333EA', radius: 103, points: 3000  },
-  { id: 9,  type: 'aquamarine',  color: '#67E8F9', radius: 125, points: 7500  },
-  { id: 10, type: 'ruby',        color: '#F472B6', radius: 149, points: 18000 },
-  { id: 11, type: 'diamond',     color: '#E8E8E8', radius: 179, points: 50000 },
+  { id: 0,  type: 'pebble',       color: '#C0B8A8', radius: 24, points: 2     },
+  { id: 1,  type: 'moonstone',   color: '#B8A9D4', radius: 29, points: 5     },
+  { id: 2,  type: 'turquoise',   color: '#5EC4B6', radius: 35, points: 12    },
+  { id: 3,  type: 'aqua',        color: '#0E6E8A', radius: 42, points: 30    },
+  { id: 4,  type: 'sapphire',    color: '#2563EB', radius: 50, points: 80    },
+  { id: 5,  type: 'amethyst',    color: '#9333EA', radius: 60, points: 200   },
+  { id: 6,  type: 'ruby',        color: '#DC2626', radius: 72, points: 500   },
+  { id: 7,  type: 'citrine',     color: '#E8752F', radius: 86, points: 1200  },
+  { id: 8,  type: 'topaz',       color: '#F5C542', radius: 103, points: 3000  },
+  { id: 9,  type: 'emerald',     color: '#50C878', radius: 125, points: 7500  },
+  { id: 10, type: 'diamond',     color: '#E8E8E8', radius: 149, points: 18000 },
 ] as const;
 
 /**

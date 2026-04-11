@@ -148,7 +148,7 @@ function finalize(bh: ActiveBlackhole): void {
 
   // Big explosion bursts
   emitMergeBurst(pos.x, pos.y, nextTier, false);
-  emitMergeBurst(pos.x, pos.y, Math.min(tier + 3, 11), false);
+  emitMergeBurst(pos.x, pos.y, Math.min(tier + 3, 10), false);
 
   _onBlackhole?.(tier, absorbed, totalPoints, pos.x, pos.y);
 }

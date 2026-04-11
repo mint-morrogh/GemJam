@@ -21,18 +21,17 @@ interface SpriteEntry {
  * Tier 11 is natural diamond gray (tint: false).
  */
 const TIER_SPRITES: SpriteEntry[] = [
-  { file: 'gem_pebble.png', tint: false }, // 0: pebble (smallest)
-  { file: 'gem_tier1.png',  tint: false }, // 1: raw rock with small gems
-  { file: 'gem_tier2.png',  tint: false }, // 2: raw rock with larger gems
-  { file: 'gem_tier3.png',  tint: false }, // 3: crystal cluster (colorful)
-  { file: 'gem_tier4.png',  tint: true  }, // 4: rough diamond
-  { file: 'gem_tier5.png',  tint: true  }, // 5: kite crystal
-  { file: 'gem_tier6.png',  tint: true  }, // 6: triangle
-  { file: 'gem_tier7.png',  tint: true  }, // 7: square
-  { file: 'gem_tier8.png',  tint: true  }, // 8: hexagon
-  { file: 'gem_tier9.png',  tint: true  }, // 9: round
-  { file: 'gem_tier10.png', tint: true  }, // 10: classic diamond
-  { file: 'gem_tier11.png', tint: false }, // 11: brilliant diamond (natural gray)
+  { file: 'gem_pebble.png', tint: false }, // 0: pebble (no color)
+  { file: 'gem_tier1.png',  tint: true  }, // 1: moonstone (lavender)
+  { file: 'gem_tier2.png',  tint: true  }, // 2: turquoise
+  { file: 'gem_tier3.png',  tint: true  }, // 3: sapphire (blue)
+  { file: 'gem_tier4.png',  tint: true  }, // 4: amethyst (purple)
+  { file: 'gem_tier5.png',  tint: true  }, // 5: ruby (red)
+  { file: 'gem_tier6.png',  tint: true  }, // 6: citrine (orange)
+  { file: 'gem_tier7.png',  tint: true  }, // 7: topaz (yellow)
+  { file: 'gem_tier8.png',  tint: true  }, // 8: emerald (green)
+  { file: 'gem_tier9.png',  tint: true  }, // 9: jade (dark green)
+  { file: 'gem_tier10.png', tint: false }, // 10: diamond (natural gray)
 ];
 
 // Deduplicate and preload all unique images

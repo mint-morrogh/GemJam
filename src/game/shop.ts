@@ -188,9 +188,9 @@ export function getBounceBonus(): number { return bounceBonus; }
 const ITEM_DEFS: ShopItemDef[] = [
   {
     id: 'garnet_chance',
-    name: 'Garnet Finder',
-    nameColor: '#DC2626',
-    description: (pct) => `+${pct.toFixed(1)}% garnet in launcher`,
+    name: 'Sapphire Finder',
+    nameColor: '#2563EB',
+    description: (pct) => `+${pct.toFixed(1)}% sapphire in launcher`,
     basePct: 1,
     baseCost: 120,
     apply: (pct) => setGarnetChance(Math.min(0.5, getGarnetChance() + pct / 100)),
@@ -364,7 +364,7 @@ export function resetShop(): void {
 /** Get summary of all active upgrades for display. */
 export function getActiveUpgrades(): { name: string; value: string }[] {
   const ups: { name: string; value: string }[] = [];
-  const gc = getGarnetChance();    if (gc > 0) ups.push({ name: 'Garnet Finder', value: `${(gc * 100).toFixed(1)}%` });
+  const gc = getGarnetChance();    if (gc > 0) ups.push({ name: 'Sapphire Finder', value: `${(gc * 100).toFixed(1)}%` });
   const hc = getHeavyChance();     if (hc > 0) ups.push({ name: 'Heavy Gem', value: `${(hc * 100).toFixed(1)}%` });
   const bc = getBonusChance();     if (bc > 0) ups.push({ name: 'Score Gem', value: `${(bc * 100).toFixed(1)}%` });
   const ts = getTierSkipChance();  if (ts > 0) ups.push({ name: 'Tier Skip', value: `${(ts * 100).toFixed(1)}%` });

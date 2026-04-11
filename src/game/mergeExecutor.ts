@@ -116,9 +116,9 @@ export function processMerges(world: World): Body[] {
       triggerScreenShake(5 + tier * 2, 6);
 
       // Big explosion visuals — 4 layered particle bursts
-      emitMergeBurst(event.midX, event.midY, Math.min(tier + 3, 11), event.rainbow);
-      emitMergeBurst(event.midX, event.midY, Math.min(tier + 2, 11), event.rainbow);
-      emitMergeBurst(event.midX, event.midY, Math.min(tier + 1, 11), event.rainbow);
+      emitMergeBurst(event.midX, event.midY, Math.min(tier + 3, 10), event.rainbow);
+      emitMergeBurst(event.midX, event.midY, Math.min(tier + 2, 10), event.rainbow);
+      emitMergeBurst(event.midX, event.midY, Math.min(tier + 1, 10), event.rainbow);
       emitMergeBurst(event.midX, event.midY, tier, event.rainbow);
     }
 
