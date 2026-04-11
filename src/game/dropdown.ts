@@ -4,6 +4,7 @@
 
 import { VIRTUAL_WIDTH, IS_PORTRAIT } from '../canvas';
 import { getAutoShakeMobile, setAutoShakeMobile } from './levelShake';
+import { getActiveUpgrades } from './shop';
 
 const IS_MOBILE = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
@@ -12,14 +13,23 @@ const IS_MOBILE = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 // ---------------------------------------------------------------------------
 
 const NAV_H = 40;
-const PANEL_H = IS_PORTRAIT ? 240 : 190;
+const BASE_PANEL_H = IS_PORTRAIT ? 240 : 190;
+const UPGRADE_ROW_H = 16;
 const ANIM_DUR = 0.25;
+
+/** Dynamic panel height based on active upgrades count. */
+function getPanelH(): number {
+  const ups = getActiveUpgrades();
+  if (ups.length === 0) return BASE_PANEL_H;
+  return BASE_PANEL_H + 20 + ups.length * UPGRADE_ROW_H + 10;
+}
 
 const BTN_W = IS_PORTRAIT ? 200 : 180;
 const BTN_H = IS_PORTRAIT ? 44 : 38;
 const BTN_X = (VIRTUAL_WIDTH - BTN_W) / 2;
-const RESTART_BTN_Y = NAV_H + PANEL_H - BTN_H - 20;
-const TOGGLE_Y = RESTART_BTN_Y - BTN_H - 12; // auto-shake toggle above restart
+
+function getRestartBtnY(): number { return NAV_H + getPanelH() - BTN_H - 20; }
+function getToggleY(): number { return getRestartBtnY() - BTN_H - 12; }
 
 // ---------------------------------------------------------------------------
 // State
@@ -71,14 +81,14 @@ export function isClickInNav(vy: number): boolean {
 export function isClickOnRestart(vx: number, vy: number): boolean {
   if (ds.progress < 0.9) return false;
   return vx >= BTN_X && vx <= BTN_X + BTN_W &&
-    vy >= RESTART_BTN_Y && vy <= RESTART_BTN_Y + BTN_H;
+    vy >= getRestartBtnY() && vy <= getRestartBtnY() + BTN_H;
 }
 
 /** Check if a click hits the auto-shake toggle (mobile only). */
 export function isClickOnAutoShake(vx: number, vy: number): boolean {
   if (!IS_MOBILE || ds.progress < 0.9) return false;
   return vx >= BTN_X && vx <= BTN_X + BTN_W &&
-    vy >= TOGGLE_Y && vy <= TOGGLE_Y + BTN_H;
+    vy >= getToggleY() && vy <= getToggleY() + BTN_H;
 }
 
 /** Handle auto-shake toggle click. Returns true if handled. */
@@ -91,7 +101,7 @@ export function handleAutoShakeToggle(vx: number, vy: number): boolean {
 /** Check if a click is in the backdrop area (below panel, used to dismiss). */
 export function isClickOnBackdrop(vy: number): boolean {
   if (ds.progress < 0.5) return false;
-  return vy > NAV_H + PANEL_H * ds.progress;
+  return vy > NAV_H + getPanelH() * ds.progress;
 }
 
 // ---------------------------------------------------------------------------
@@ -117,19 +127,19 @@ export function drawDropdown(
   // Panel background (slides down from nav)
   ctx.save();
   ctx.beginPath();
-  ctx.rect(0, NAV_H, w, PANEL_H * ds.progress);
+  ctx.rect(0, NAV_H, w, getPanelH() * ds.progress);
   ctx.clip();
 
   // Background
   ctx.fillStyle = '#0c1018';
-  ctx.fillRect(0, NAV_H, w, PANEL_H);
+  ctx.fillRect(0, NAV_H, w, getPanelH());
 
   // Bottom edge line
   ctx.strokeStyle = 'rgba(232, 196, 74, 0.2)';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(0, NAV_H + PANEL_H);
-  ctx.lineTo(w, NAV_H + PANEL_H);
+  ctx.moveTo(0, NAV_H + getPanelH());
+  ctx.lineTo(w, NAV_H + getPanelH());
   ctx.stroke();
 
   // -- Stats rows --
@@ -162,12 +172,45 @@ export function drawDropdown(
     rowY += rowH;
   }
 
+  // -- Active upgrades list --
+  const upgrades = getActiveUpgrades();
+  if (upgrades.length > 0) {
+    rowY += 8;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(labelX, rowY);
+    ctx.lineTo(valueX, rowY);
+    ctx.stroke();
+    rowY += 10;
+
+    ctx.font = `bold 9px monospace`;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.textAlign = 'left';
+    ctx.fillText('UPGRADES', labelX, rowY);
+    rowY += 14;
+
+    for (const up of upgrades) {
+      ctx.font = `10px monospace`;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.textAlign = 'left';
+      ctx.fillText(up.name, labelX, rowY);
+
+      ctx.font = `bold 10px monospace`;
+      ctx.fillStyle = '#7dd3fc';
+      ctx.textAlign = 'right';
+      ctx.fillText(up.value, valueX, rowY);
+
+      rowY += UPGRADE_ROW_H;
+    }
+  }
+
   // -- Auto-shake toggle (mobile only) --
   if (IS_MOBILE) {
     const btnR = 8;
     const isAuto = getAutoShakeMobile();
     ctx.beginPath();
-    ctx.roundRect(BTN_X, TOGGLE_Y, BTN_W, BTN_H, btnR);
+    ctx.roundRect(BTN_X, getToggleY(), BTN_W, BTN_H, btnR);
     ctx.fillStyle = isAuto ? 'rgba(80, 200, 120, 0.15)' : 'rgba(100, 120, 150, 0.1)';
     ctx.fill();
     ctx.strokeStyle = isAuto ? 'rgba(80, 200, 120, 0.4)' : 'rgba(100, 120, 150, 0.25)';
@@ -178,14 +221,14 @@ export function drawDropdown(
     ctx.fillStyle = isAuto ? '#4ade80' : '#6b7280';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`AUTO-SHAKE: ${isAuto ? 'ON' : 'OFF'}`, VIRTUAL_WIDTH / 2, TOGGLE_Y + BTN_H / 2);
+    ctx.fillText(`AUTO-SHAKE: ${isAuto ? 'ON' : 'OFF'}`, VIRTUAL_WIDTH / 2, getToggleY() + BTN_H / 2);
   }
 
   // -- Restart button --
   {
     const btnR = 8;
     ctx.beginPath();
-    ctx.roundRect(BTN_X, RESTART_BTN_Y, BTN_W, BTN_H, btnR);
+    ctx.roundRect(BTN_X, getRestartBtnY(), BTN_W, BTN_H, btnR);
     ctx.fillStyle = 'rgba(220, 38, 38, 0.15)';
     ctx.fill();
     ctx.strokeStyle = 'rgba(220, 38, 38, 0.4)';
@@ -196,7 +239,7 @@ export function drawDropdown(
     ctx.fillStyle = '#f87171';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('RESTART GAME', VIRTUAL_WIDTH / 2, RESTART_BTN_Y + BTN_H / 2);
+    ctx.fillText('RESTART GAME', VIRTUAL_WIDTH / 2, getRestartBtnY() + BTN_H / 2);
   }
 
   ctx.restore(); // remove clip

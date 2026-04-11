@@ -41,6 +41,7 @@ export type ShakePhase =
   | 'countdown'     // "3... 2... 1..." (3s)
   | 'shaking'       // shake phase (1s)
   | 'settling'      // physics runs, gems settle after shake (2s)
+  | 'shop'          // shop modal (blocks until user closes)
   | 'resume';       // brief "Level X" flash (0.5s)
 
 interface LevelState {
@@ -191,13 +192,13 @@ export function updateLevelShake(dt: number): boolean {
 
   switch (ls.phase) {
     case 'level_banner':
-      if (ls.phaseTimer >= 1.2) {
+      if (ls.phaseTimer >= 2.5) {
         ls.phase = 'countdown';
         ls.phaseTimer = 0;
         ls.countdownNum = 3;
         ls.shakeScore = 0;
       }
-      return true;
+      return false; // physics keeps running so gems settle
 
     case 'countdown':
       ls.countdownNum = 3 - Math.floor(ls.phaseTimer);
@@ -221,11 +222,15 @@ export function updateLevelShake(dt: number): boolean {
 
     case 'settling':
       // Let gems settle after shaking — physics runs, no level check
-      if (ls.phaseTimer >= 2.0) {
-        ls.phase = 'resume';
+      if (ls.phaseTimer >= 5.0) {
+        ls.phase = 'shop';
         ls.phaseTimer = 0;
       }
       return false; // physics runs during settle!
+
+    case 'shop':
+      // Blocked until shop is closed externally via closeShopPhase()
+      return true;
 
     case 'resume':
       if (ls.phaseTimer >= 0.5) {
@@ -254,12 +259,20 @@ export function setLevel(level: number): void {
   ls.level = level;
 }
 
+/** Transition from shop → resume (called when user closes the shop). */
+export function closeShopPhase(): void {
+  if (ls.phase === 'shop') {
+    ls.phase = 'resume';
+    ls.phaseTimer = 0;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------
 
 export function drawLevelOverlay(ctx: CanvasRenderingContext2D, _time?: number): void {
-  if (ls.phase === 'playing' || ls.phase === 'settling') return;
+  if (ls.phase === 'playing' || ls.phase === 'settling' || ls.phase === 'shop') return;
 
   const cx = VIRTUAL_WIDTH / 2;
   const cy = VIRTUAL_HEIGHT / 2;
@@ -278,17 +291,45 @@ export function drawLevelOverlay(ctx: CanvasRenderingContext2D, _time?: number):
 
   switch (ls.phase) {
     case 'level_banner': {
-      // "LEVEL X COMPLETE!"
-      const bannerAlpha = Math.min(ls.phaseTimer / 0.3, 1);
-      ctx.globalAlpha = bannerAlpha;
+      const t = ls.phaseTimer;
+      // Phase 1 (0-0.4s): pop in big
+      // Phase 2 (0.4-1.8s): hold at normal size
+      // Phase 3 (1.8-2.5s): shrink and fade out
+      let scale: number;
+      let alpha: number;
+      if (t < 0.4) {
+        // Pop in: overshoot then settle
+        const p = t / 0.4;
+        scale = 0.3 + 1.2 * p - 0.5 * p * p; // peaks at ~1.15 then settles to 1.0
+        alpha = Math.min(1, p * 2);
+      } else if (t < 1.8) {
+        scale = 1;
+        alpha = 1;
+      } else {
+        // Shrink out
+        const p = (t - 1.8) / 0.7;
+        scale = 1 - p * 0.6;
+        alpha = 1 - p;
+      }
 
-      ctx.font = `bold ${IS_PORTRAIT ? 18 : 16}px monospace`;
+      ctx.globalAlpha = Math.max(0, alpha);
+
+      // "LEVEL COMPLETE!" — scales with the animation
+      const titleSize = Math.round((IS_PORTRAIT ? 24 : 20) * scale);
+      ctx.font = `bold ${titleSize}px monospace`;
       ctx.fillStyle = '#e8c44a';
-      ctx.fillText('LEVEL COMPLETE!', cx, cy - 30);
+      ctx.save();
+      ctx.shadowColor = '#e8c44a';
+      ctx.shadowBlur = 15 * scale;
+      ctx.fillText('LEVEL COMPLETE!', cx, cy - 25 * scale);
+      ctx.restore();
+      ctx.globalAlpha = Math.max(0, alpha);
 
-      ctx.font = `bold ${IS_PORTRAIT ? 42 : 36}px monospace`;
+      // Level number — bigger
+      const numSize = Math.round((IS_PORTRAIT ? 52 : 44) * scale);
+      ctx.font = `bold ${numSize}px monospace`;
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(`Level ${ls.level}`, cx, cy + 15);
+      ctx.fillText(`Level ${ls.level}`, cx, cy + 20 * scale);
 
       break;
     }

@@ -22,8 +22,10 @@ import { startProfiling, recordFrame, drawPerfOverlay } from './game/perfProfile
 import { autoDetectQuality, feedFrameTime, updateTransition, shouldRenderEffects } from './game/renderConfig';
 import { getBoardCache } from './game/boardCache';
 import { writeSave, readSave, clearSave } from './game/persistence';
-import { initShakeDetection, checkLevelUp, updateLevelShake, getShakeGravity, getShakePhase, getCurrentLevel, pointsToNextLevel, getLidProgress, resetLevelShake, setLevel, drawLevelOverlay } from './game/levelShake';
+import { initShakeDetection, checkLevelUp, updateLevelShake, getShakeGravity, getShakePhase, getCurrentLevel, pointsToNextLevel, getLidProgress, resetLevelShake, setLevel, closeShopPhase, drawLevelOverlay } from './game/levelShake';
 import { isDropdownOpen, toggleDropdown, closeDropdown, updateDropdown, isClickInNav, isClickOnRestart, isClickOnBackdrop, handleAutoShakeToggle, drawDropdown } from './game/dropdown';
+import { getGold, addGold, goldForTier, spawnGoldText, spawnScoreText, spawnFloatingLabel, updateFloatingText, drawFloatingText, openShop, closeShop, clearShopForNextLevel, isShopOpen, buyItem, rerollShop, getShopClickIndex, isClickOnContinue, isClickOnReroll, drawShop, resetShop, getShopSaveData, restoreShopData } from './game/shop';
+import { setOnBlackhole, resetBlackholeTracker, updateBlackholes, drawActiveBlackholes } from './game/blackhole';
 import type { SaveData, GemSnapshot } from './game/persistence';
 import { drawPauseOverlay } from './game/renderer';
 
@@ -74,23 +76,56 @@ initMergeSystem(world);
 const scoring = createScoringState(loadHighScore());
 let elapsedTime = 0;
 
-setOnMerge((resultTier, rainbow) => {
+setOnMerge((resultTier, _rainbow, midX, midY, bonusMerge, tierSkipped, bonusGemSpawned, exploded) => {
   registerMerge(scoring, elapsedTime);
 
-  // Disappear merges (rainbow tier 11 × 2) still score big
   const scoreTier = resultTier === -1 ? 11 : resultTier;
-  const pts = awardMergePoints(scoring, scoreTier);
+  const combo = scoring.comboCount;
+  const basePts = awardMergePoints(scoring, scoreTier);
+  const gemR = GEM_TIERS[scoreTier]?.radius ?? 30;
+
+  // Score popup (offset above the merged gem's top edge)
+  const totalPts = bonusMerge ? basePts * 5 : basePts;
+  if (totalPts > 0) spawnScoreText(midX, midY - gemR - 28, totalPts, combo);
+
+  // Bonus gem: 5x score (award the extra 4x on top)
+  if (bonusMerge && basePts > 0) {
+    scoring.score += basePts * 4;
+  }
+
+  // Gold reward (spaced below score text)
+  const goldAmt = goldForTier(scoreTier) * (bonusMerge ? 5 : 1);
+  addGold(goldAmt);
+  spawnGoldText(midX, midY - gemR - 8, goldAmt);
+
+  // Tier skip announcement
+  if (tierSkipped) {
+    spawnFloatingLabel(midX, midY - 50, 'TIER SKIP!', '#67E8F9', 1.2);
+  }
+
+  // Bonus gem spawn announcement
+  if (bonusGemSpawned) {
+    spawnFloatingLabel(midX, midY - 65, 'BONUS GEM!', '#4ADE80', 1.2);
+  }
+
+  // Explosion announcement
+  if (exploded) {
+    spawnFloatingLabel(midX, midY - 80, 'BOOM!', '#FF6B2D', 1.0);
+  }
 
   // Track run stats
   state.mergeCount++;
   if (scoreTier > state.peakTier) state.peakTier = scoreTier;
   if (scoring.comboCount > state.maxCombo) state.maxCombo = scoring.comboCount;
+});
 
-  const tag = rainbow ? ' [rainbow]' : '';
-  const result = resultTier === -1 ? 'DISAPPEAR' : `tier ${resultTier}${tag}`;
-  console.log(
-    `[score] +${pts} pts (${result}, combo ${scoring.comboCount}×${scoring.comboMultiplier}) → total ${scoring.score}`,
-  );
+// -- Black hole callback ----------------------------------------------------
+setOnBlackhole((tier, absorbed, totalPoints, x, y) => {
+  scoring.score += totalPoints;
+  const goldAmt = goldForTier(tier) * (absorbed + 1);
+  addGold(goldAmt);
+  spawnFloatingLabel(x, y - 30, `BLACK HOLE! x${absorbed + 1}`, '#C084FC', 1.5);
+  spawnGoldText(x, y - 10, goldAmt);
 });
 
 // -- Game state (preview gem + column-drop logic) ---------------------------
@@ -103,7 +138,7 @@ let shakeLid: import('planck').Body | null = null;
 /** Accumulated time (seconds) that gems have continuously been above the top line. */
 let overflowTimer = 0;
 /** How long overflow must persist before triggering game over (seconds). */
-const OVERFLOW_GRACE = 1.5;
+const OVERFLOW_GRACE = 4;
 /** Whether the current/last run set a new high score. */
 let isNewHighScore = false;
 /** Score history snapshot taken at game over. */
@@ -134,7 +169,7 @@ function gatherSave(): SaveData {
   return {
     version: 1,
     gems,
-    queue: state.gemQueue.map((g) => g.id),
+    queue: state.gemQueue.map((g) => g.def.id),
     score: scoring.score,
     highScore: scoring.highScore,
     comboCount: scoring.comboCount,
@@ -147,6 +182,7 @@ function gatherSave(): SaveData {
     maxCombo: state.maxCombo,
     gameOver: state.gameOver,
     level: getCurrentLevel(),
+    ...getShopSaveData(),
   };
 }
 
@@ -167,7 +203,7 @@ function restoreFromSave(save: SaveData): void {
   state.gemQueue.length = 0;
   for (const tid of save.queue) {
     const def = GEM_TIERS[tid];
-    if (def) state.gemQueue.push(def);
+    if (def) state.gemQueue.push({ def, heavy: false, bonus: false, blackhole: false });
   }
 
   // Restore scoring
@@ -190,6 +226,7 @@ function restoreFromSave(save: SaveData): void {
 
   // Restore level
   if (save.level && save.level > 1) setLevel(save.level);
+  restoreShopData(save as any);
 }
 
 // Try to restore a previous session on load
@@ -271,6 +308,8 @@ function restartGame(): void {
 
   // Reset level system
   resetLevelShake();
+  resetShop();
+  resetBlackholeTracker();
 }
 
 // -- Play Again click detection (delegated to gameOverScreen module) --------
@@ -279,6 +318,15 @@ installGameOverClickHandler(canvas, () => state.gameOver, restartGame);
 // -- Dropdown menu + nav bar click handling ----------------------------------
 function handleMenuClick(clientX: number, clientY: number): void {
   const vp = screenToVirtual(canvas, clientX, clientY);
+
+  // Shop clicks take priority
+  if (isShopOpen()) {
+    const idx = getShopClickIndex(vp.x, vp.y);
+    if (idx >= 0) { buyItem(idx); return; }
+    if (isClickOnReroll(vp.x, vp.y)) { rerollShop(); return; }
+    if (isClickOnContinue(vp.x, vp.y)) { closeShop(); clearShopForNextLevel(); closeShopPhase(); return; }
+    return;
+  }
 
   if (isDropdownOpen()) {
     // Auto-shake toggle
@@ -323,15 +371,17 @@ input.onFire = (aimX, aimY) => {
   if (!vel) return;
 
   // Consume next gem from queue
-  const gemDef = consumeNextGem(state);
-  const tierIndex = GEM_TIERS.indexOf(gemDef);
+  const spawn = consumeNextGem(state);
+  const tierIndex = GEM_TIERS.indexOf(spawn.def);
 
   // Spawn physics body at launch point with initial velocity + random spin
-  const body = spawnGem(world, launcher.launchX, launcher.launchY, tierIndex);
+  const body = spawnGem(world, launcher.launchX, launcher.launchY, tierIndex, false, spawn.heavy);
+  if (spawn.bonus) { const d = getGemData(body); if (d) d.bonus = true; }
+  if (spawn.blackhole) { const d = getGemData(body); if (d) d.blackhole = true; }
   setVelocity(body, vel.vx, vel.vy);
   setAngularVelocity(body, (Math.random() - 0.5) * 0.15);
 
-  triggerQueueShift(gemDef);
+  triggerQueueShift(spawn.def);
   fireCooldown = 0.35;
 };
 
@@ -413,6 +463,11 @@ startLoop({
 
     // Idle sparkles on gem tiers 4+
     updateGemSparkles(_dt, allBods);
+    updateBlackholes(_dt);
+    updateFloatingText(_dt);
+
+    // Open shop when phase transitions to 'shop'
+    if (getShakePhase() === 'shop' && !isShopOpen()) openShop();
 
     // Expire combo window
     updateCombo(scoring, elapsedTime);
@@ -464,11 +519,11 @@ startLoop({
     ctx.drawImage(getBoardCache(), 0, 0);
 
     drawNextGemPanel(ctx, state.gemQueue);
-    drawScoreHUD(ctx, scoring, getCurrentLevel(), pointsToNextLevel(scoring.score, getCurrentLevel()));
+    drawScoreHUD(ctx, scoring, getCurrentLevel(), pointsToNextLevel(scoring.score, getCurrentLevel()), getGold());
 
     // Danger zone indicator at top of container
     const danger = getDangerLevel(world);
-    if (getSettings().showDangerWarning) drawDangerZone(ctx, danger, elapsedTime);
+    if (getSettings().showDangerWarning) drawDangerZone(ctx, danger, elapsedTime, overflowTimer / OVERFLOW_GRACE);
 
     // Shake lid (glass panels sliding shut/open)
     drawShakeLid(ctx, getLidProgress());
@@ -477,12 +532,12 @@ startLoop({
     if (input.aim.active && !state.gameOver) {
       const vel = getLaunchVelocity(launcher, input.aim.x, input.aim.y);
       if (vel) {
-        const gemDef = state.nextGem;
+        const nextDef = state.nextGem.def;
         const trajectory = computeTrajectory(
           launcher.launchX, launcher.launchY,
-          vel.vx, vel.vy, gemDef.radius, gemDef.id,
+          vel.vx, vel.vy, nextDef.radius, nextDef.id,
         );
-        drawTrajectory(ctx, trajectory, elapsedTime, gemDef.color, gemDef.radius);
+        drawTrajectory(ctx, trajectory, elapsedTime);
       }
     }
 
@@ -496,6 +551,9 @@ startLoop({
     // Gem shimmers (twinkle stars on gem surfaces)
     if (renderEffects) drawGemShimmers(ctx);
 
+    // Active black hole vortex animations
+    drawActiveBlackholes(ctx, elapsedTime);
+
     // Merge animations (scale-up + flash)
     updateAndDrawMergeAnimations(ctx, FIXED_DT, renderEffects);
 
@@ -504,14 +562,20 @@ startLoop({
 
     // Launcher gem (on top of everything except overlays)
     if (!state.gameOver) {
-      drawLauncherGem(ctx, launcher.launchX, launcher.launchY, state.nextGem, elapsedTime);
+      drawLauncherGem(ctx, launcher.launchX, launcher.launchY, state.nextGem.def, elapsedTime, state.nextGem.heavy, state.nextGem.bonus, state.nextGem.blackhole);
     }
 
     // End screen shake transform
     if (shake.x || shake.y) ctx.restore();
 
+    // Floating gold text
+    drawFloatingText(ctx);
+
     // Level interlude overlay (banner, countdown, shake)
     drawLevelOverlay(ctx, elapsedTime);
+
+    // Shop overlay
+    drawShop(ctx);
 
     // Dropdown menu (over everything except game-over/pause)
     drawDropdown(ctx, scoring.score, scoring.highScore, getCurrentLevel(), pointsToNextLevel(scoring.score, getCurrentLevel()));
@@ -521,15 +585,6 @@ startLoop({
     const gemBodies = bodies.filter((b) => getGemData(b));
     recordFrame(canvas, gemBodies.length);
     drawPerfOverlay(ctx);
-
-    // Clear Data button (bottom-right corner)
-    ctx.save();
-    ctx.font = '12px sans-serif';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText('Clear Data', VIRTUAL_WIDTH - 10, VIRTUAL_HEIGHT - 8);
-    ctx.restore();
 
     // Game-over overlay
     if (state.gameOver) {

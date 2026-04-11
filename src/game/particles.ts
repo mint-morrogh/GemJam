@@ -201,7 +201,9 @@ export function emitMergeBurst(x: number, y: number, tier: number, rainbow = fal
       : () => def.color;
 
   // --- Main burst: dense colored particles radiating outward ---
-  const count = 20 + tier * 5;                        // 20–75 particles
+  const gemR = def.radius;
+  const spread = gemR * 0.6; // particles spawn from within the gem edge
+  const count = 20 + tier * 5;
   const speed = 120 + tier * 40;
   const baseSize = 3.5 + tier * 0.9;
   const lifetime = 0.2 + tier * 0.025;
@@ -213,8 +215,8 @@ export function emitMergeBurst(x: number, y: number, tier: number, rainbow = fal
     const sz = baseSize * (0.4 + Math.random() * 1.2);
 
     particles.spawn({
-      x: x + (Math.random() - 0.5) * 8,
-      y: y + (Math.random() - 0.5) * 8,
+      x: x + Math.cos(angle) * spread * Math.random(),
+      y: y + Math.sin(angle) * spread * Math.random(),
       vx: Math.cos(angle) * spd,
       vy: Math.sin(angle) * spd,
       lifetime: lifetime * (0.7 + Math.random() * 0.6),
@@ -232,8 +234,8 @@ export function emitMergeBurst(x: number, y: number, tier: number, rainbow = fal
     const angle = Math.random() * Math.PI * 2;
     const spd = speed * (0.5 + Math.random() * 1.0);
     particles.spawn({
-      x: x + (Math.random() - 0.5) * 4,
-      y: y + (Math.random() - 0.5) * 4,
+      x: x + Math.cos(angle) * spread * 0.5,
+      y: y + Math.sin(angle) * spread * 0.5,
       vx: Math.cos(angle) * spd,
       vy: Math.sin(angle) * spd,
       lifetime: lifetime * 0.4,
@@ -245,14 +247,15 @@ export function emitMergeBurst(x: number, y: number, tier: number, rainbow = fal
     });
   }
 
-  // --- Inner flash ring: tight burst of bright particles (tier 1+) ---
-  if (tier >= 1) {
+  // --- Inner flash ring: tight burst of bright particles (all tiers) ---
+  {
     const ringCount = 6 + tier * 2;
     for (let i = 0; i < ringCount; i++) {
       const angle = (Math.PI * 2 * i) / ringCount;
       const spd = speed * 0.3;
       particles.spawn({
-        x, y,
+        x: x + Math.cos(angle) * spread * 0.3,
+        y: y + Math.sin(angle) * spread * 0.3,
         vx: Math.cos(angle) * spd,
         vy: Math.sin(angle) * spd,
         lifetime: lifetime * 0.3,
@@ -272,8 +275,8 @@ export function emitMergeBurst(x: number, y: number, tier: number, rainbow = fal
       const angle = Math.random() * Math.PI * 2;
       const spd = 25 + Math.random() * 40;
       particles.spawn({
-        x: x + (Math.random() - 0.5) * 12,
-        y: y + (Math.random() - 0.5) * 12,
+        x: x + Math.cos(angle) * spread,
+        y: y + Math.sin(angle) * spread,
         vx: Math.cos(angle) * spd,
         vy: Math.sin(angle) * spd - 20,
         lifetime: lifetime * 2,

@@ -30,12 +30,16 @@ interface RaysAnim { x: number; y: number; radius: number; color: string; rayCou
 /** Star burst — small 4-pointed stars flying outward */
 interface StarAnim { x: number; y: number; vx: number; vy: number; size: number; color: string; elapsed: number; duration: number; rotation: number; rotSpeed: number; }
 
+/** Morph ghost — the old tier fades out while expanding */
+interface MorphAnim { x: number; y: number; fromRadius: number; toRadius: number; color: string; elapsed: number; duration: number; }
+
 const scaleAnims: ScaleAnim[] = [];
 const flashAnims: FlashAnim[] = [];
 const ringAnims: RingAnim[] = [];
 const glowAnims: GlowAnim[] = [];
 const raysAnims: RaysAnim[] = [];
 const starAnims: StarAnim[] = [];
+const morphAnims: MorphAnim[] = [];
 
 // ---------------------------------------------------------------------------
 // Screen shake state (read by render loop)
@@ -56,7 +60,7 @@ export function getScreenShake(): { x: number; y: number } {
 // Public API
 // ---------------------------------------------------------------------------
 
-export function addMergeAnimation(body: Body, midX: number, midY: number): void {
+export function addMergeAnimation(body: Body, midX: number, midY: number, prevTier = -1): void {
   const data = getGemData(body);
   if (!data) return;
   const def = GEM_TIERS[data.tier];
@@ -70,29 +74,42 @@ export function addMergeAnimation(body: Body, midX: number, midY: number): void 
     if (scaleAnims[i].body === body) scaleAnims.splice(i, 1);
   }
 
+  // Morph ghost: old tier expands and fades into new tier
+  if (prevTier >= 0) {
+    const prevDef = GEM_TIERS[prevTier];
+    if (prevDef) {
+      morphAnims.push({
+        x: midX, y: midY,
+        fromRadius: prevDef.radius,
+        toRadius: def.radius * 1.3,
+        color: prevDef.color,
+        elapsed: 0,
+        duration: 0.15 * tm,
+      });
+    }
+  }
+
   // Scale-up (always)
   scaleAnims.push({ body, tier, elapsed: 0, duration: BASE_SCALE_DUR * tm });
 
-  // Flash (always)
+  // Flash (always — brighter for all tiers)
   flashAnims.push({
     x: midX, y: midY,
-    radius: def.radius * (1.8 + tier * 0.2),
+    radius: def.radius * (2.0 + tier * 0.2),
     tier, color: def.color, elapsed: 0,
     duration: BASE_FLASH_DUR * tm,
   });
 
-  // Thin expanding ring (tier 1+)
-  if (tier >= 1) {
-    ringAnims.push({
-      x: midX, y: midY,
-      maxRadius: def.radius * (2.5 + tier * 0.3),
-      color: def.color, tier, elapsed: 0,
-      duration: BASE_RING_DUR * tm, thick: false,
-    });
-  }
+  // Thin expanding ring (always — even tier 0)
+  ringAnims.push({
+    x: midX, y: midY,
+    maxRadius: def.radius * (2.5 + tier * 0.3),
+    color: def.color, tier, elapsed: 0,
+    duration: BASE_RING_DUR * tm, thick: false,
+  });
 
-  // Second thick ring (tier 3+)
-  if (tier >= 3) {
+  // Second thick ring (tier 2+)
+  if (tier >= 2) {
     ringAnims.push({
       x: midX, y: midY,
       maxRadius: def.radius * (3.0 + tier * 0.4),
@@ -157,6 +174,7 @@ export function resetMergeAnimations(): void {
   glowAnims.length = 0;
   raysAnims.length = 0;
   starAnims.length = 0;
+  morphAnims.length = 0;
   shakeIntensity = 0;
 }
 
@@ -191,6 +209,31 @@ export function updateAndDrawMergeAnimations(
   // Decay screen shake
   if (shakeIntensity > 0) {
     shakeIntensity = Math.max(0, shakeIntensity - shakeDecay * dt);
+  }
+
+  // -- Morph ghost (old tier expanding + fading) --------------------------------
+  for (let i = morphAnims.length - 1; i >= 0; i--) {
+    const a = morphAnims[i];
+    a.elapsed += dt;
+    const t = Math.min(a.elapsed / a.duration, 1);
+    if (renderEffects) {
+      const r = a.fromRadius + (a.toRadius - a.fromRadius) * t;
+      const alpha = (1 - t) * 0.6;
+      if (alpha > 0.01) {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = a.color;
+        ctx.fill();
+        // White edge ring
+        ctx.strokeStyle = `rgba(255, 255, 255, ${(alpha * 0.5).toFixed(2)})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+    if (t >= 1) morphAnims.splice(i, 1);
   }
 
   // -- Lingering color glow ---------------------------------------------------

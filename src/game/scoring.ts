@@ -26,7 +26,11 @@ export const COMBO_THRESHOLDS: readonly [number, number][] = [
 export const BASE_MULTIPLIER = 1;
 
 /** Seconds after a merge during which the next merge still counts as a combo. */
-export const COMBO_WINDOW = 1.5;
+import { getComboWindowBonus } from './shop';
+
+const BASE_COMBO_WINDOW = 1.5;
+/** Effective combo window including shop upgrades. */
+export function getComboWindow(): number { return BASE_COMBO_WINDOW + getComboWindowBonus(); }
 
 // ---------------------------------------------------------------------------
 // State
@@ -73,11 +77,11 @@ export function comboMultiplierFor(comboCount: number): number {
 
 /**
  * Register a merge event at the given elapsed game time.
- * Increments combo if within COMBO_WINDOW of the last merge, otherwise resets to 1.
+ * Increments combo if within getComboWindow() of the last merge, otherwise resets to 1.
  * Updates comboMultiplier accordingly.
  */
 export function registerMerge(scoring: ScoringState, now: number): void {
-  if (now - scoring.lastMergeTime <= COMBO_WINDOW) {
+  if (now - scoring.lastMergeTime <= getComboWindow()) {
     scoring.comboCount += 1;
   } else {
     scoring.comboCount = 1;
@@ -93,7 +97,7 @@ export function registerMerge(scoring: ScoringState, now: number): void {
  * Call each update tick to reset combo when the window expires.
  */
 export function updateCombo(scoring: ScoringState, now: number): void {
-  if (scoring.comboCount > 0 && now - scoring.lastMergeTime > COMBO_WINDOW) {
+  if (scoring.comboCount > 0 && now - scoring.lastMergeTime > getComboWindow()) {
     scoring.comboCount = 0;
     scoring.comboMultiplier = BASE_MULTIPLIER;
   }

@@ -53,8 +53,8 @@ const BOTTOM_STRIP_Y = IS_PORTRAIT
 const BOTTOM_STRIP_X = GRID.containerX;
 const BOTTOM_STRIP_W = GRID.containerWidth;
 /** Horizontal spacing between gem centers in the bottom strip. */
-const GEM_SLOT_SPACING = IS_PORTRAIT ? 90 : 80;
-const GEM_SLOT_COUNT = 3;
+const GEM_SLOT_SPACING = IS_PORTRAIT ? 70 : 65;
+const GEM_SLOT_COUNT = 4;
 
 // ---------------------------------------------------------------------------
 // Board styling — dark arcade palette (BookBreaker-inspired)
@@ -177,10 +177,16 @@ export function drawLauncherGem(
   launchY: number,
   gemDef: GemDef,
   time: number,
+  heavy = false,
+  bonus = false,
+  blackhole = false,
 ): void {
   const actualR = gemDef.radius;
   // Display at actual physics size — gems range from 14 to 22 for spawnable tiers
   const displayR = actualR;
+
+  // Bonus gem: golden aura
+  if (bonus) drawBonusAura(ctx, launchX, launchY, displayR, time, 1);
 
   // Pulsing glow ring
   const pulse = 0.5 + 0.5 * Math.sin(time * 3);
@@ -223,6 +229,37 @@ export function drawLauncherGem(
     ctx.stroke();
   }
 
+  // Heavy gem: just a dark overlay, no text
+  if (heavy) {
+    ctx.globalAlpha = 0.4;
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(launchX, launchY, displayR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Blackhole: dark purple swirling aura
+  if (blackhole) {
+    const bhPulse = 0.5 + 0.5 * Math.sin(time * 5);
+    ctx.save();
+    ctx.globalAlpha = 0.5 + 0.2 * bhPulse;
+    const bhGrad = ctx.createRadialGradient(launchX, launchY, displayR * 0.3, launchX, launchY, displayR + 10);
+    bhGrad.addColorStop(0, '#1a0030');
+    bhGrad.addColorStop(0.5, '#6B21A8');
+    bhGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = bhGrad;
+    ctx.beginPath();
+    ctx.arc(launchX, launchY, displayR + 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 0.9;
+    ctx.font = `bold ${IS_PORTRAIT ? 10 : 9}px monospace`;
+    ctx.fillStyle = '#C084FC';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('BLACK HOLE', launchX, launchY);
+    ctx.restore();
+  }
+
   // Tier label below the gem
   ctx.font = `bold ${IS_PORTRAIT ? 11 : 10}px monospace`;
   ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
@@ -240,7 +277,7 @@ export function drawTrajectory(
   ctx: CanvasRenderingContext2D,
   points: readonly TrajectoryPoint[],
   time: number,
-  gemColor: string,
+  _gemColor?: string,
   _gemRadius?: number,
 ): void {
   if (points.length < 2) return;
@@ -274,7 +311,7 @@ export function drawTrajectory(
     for (let i = start + 1; i <= end; i++) {
       ctx.lineTo(points[i].x, points[i].y);
     }
-    ctx.strokeStyle = gemColor;
+    ctx.strokeStyle = '#ffffff';
     ctx.globalAlpha = alpha;
     ctx.lineWidth = width;
     ctx.stroke();
@@ -388,7 +425,7 @@ function drawStripGem(
  * Draw the polished "NEXT" strip below the bucket.
  * Glass-style background, gems with glow, arrow flow indicators.
  */
-export function drawNextGemPanel(ctx: CanvasRenderingContext2D, queue: readonly GemDef[]): void {
+export function drawNextGemPanel(ctx: CanvasRenderingContext2D, queue: readonly { def: GemDef; heavy: boolean; bonus: boolean; blackhole: boolean }[]): void {
   const sx = BOTTOM_STRIP_X;
   const sy = BOTTOM_STRIP_Y;
   const sw = BOTTOM_STRIP_W;
@@ -464,16 +501,16 @@ export function drawNextGemPanel(ctx: CanvasRenderingContext2D, queue: readonly 
   const totalGemsWidth = (GEM_SLOT_COUNT - 1) * GEM_SLOT_SPACING;
   const firstSlotX = gemAreaStart + (gemAreaWidth - totalGemsWidth) / 2;
 
-  // Flow arrows between gem slots
+  // Flow arrows between gem slots (pointing left toward next-to-fire)
   for (let i = 0; i < GEM_SLOT_COUNT - 1; i++) {
     const arrowX = firstSlotX + (i + 0.5) * GEM_SLOT_SPACING + slideOffset;
     ctx.save();
-    ctx.globalAlpha = 0.15;
+    ctx.globalAlpha = 0.12;
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.moveTo(arrowX - 4, centerY - 4);
-    ctx.lineTo(arrowX + 4, centerY);
-    ctx.lineTo(arrowX - 4, centerY + 4);
+    ctx.moveTo(arrowX + 4, centerY - 4);
+    ctx.lineTo(arrowX - 4, centerY);
+    ctx.lineTo(arrowX + 4, centerY + 4);
     ctx.closePath();
     ctx.fill();
     ctx.restore();
@@ -488,23 +525,52 @@ export function drawNextGemPanel(ctx: CanvasRenderingContext2D, queue: readonly 
   // Queue gems
   const slotsToShow = Math.min(queue.length, GEM_SLOT_COUNT);
   for (let i = 0; i < slotsToShow; i++) {
-    const gem = queue[i];
+    const item = queue[i];
     const slotX = firstSlotX + i * GEM_SLOT_SPACING + slideOffset;
     const isNew = animating && i === GEM_SLOT_COUNT - 1;
-    const alpha = isNew ? t : (i === 0 ? 1 : 0.4 + 0.3 * (1 - i / GEM_SLOT_COUNT));
-    const scale = i === 0 ? 1.1 : 0.75 - i * 0.05;
-    drawStripGem(ctx, gem, slotX, centerY - 2, scale, alpha, i === 0);
+    const baseAlpha = i === 0 ? 1 : 0.4 + 0.3 * (1 - i / GEM_SLOT_COUNT);
+    const alpha = isNew ? baseAlpha * t : baseAlpha;
+    drawStripGem(ctx, item.def, slotX, centerY - 2, 1, alpha, i === 0);
 
-    // Tier name below gem
-    ctx.save();
-    ctx.globalAlpha = alpha * 0.4;
-    ctx.font = `${IS_PORTRAIT ? 9 : 8}px monospace`;
-    ctx.fillStyle = gem.color;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    const labelY = centerY - 2 + Math.min(gem.radius, 20) * scale + 4;
-    ctx.fillText(gem.type, slotX, labelY);
-    ctx.restore();
+    // Blackhole gem: dark purple swirling aura in queue
+    if (item.blackhole) {
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.5;
+      ctx.fillStyle = '#6B21A8';
+      ctx.beginPath();
+      ctx.arc(slotX, centerY - 2, Math.min(item.def.radius, 20) + 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = alpha * 0.8;
+      ctx.font = 'bold 7px monospace';
+      ctx.fillStyle = '#C084FC';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('BH', slotX, centerY - 2);
+      ctx.restore();
+    }
+
+    // Bonus gem glow aura in queue
+    if (item.bonus) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = alpha * 0.25;
+      ctx.fillStyle = '#FBBF24';
+      ctx.beginPath();
+      ctx.arc(slotX, centerY - 2, Math.min(item.def.radius, 20) + 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Dark overlay for heavy gems (no text, just darker)
+    if (item.heavy) {
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.4;
+      ctx.fillStyle = '#000000';
+      ctx.beginPath();
+      ctx.arc(slotX, centerY - 2, Math.min(item.def.radius, 20), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
   ctx.restore(); // remove clip
@@ -586,42 +652,80 @@ export function drawShakeLid(ctx: CanvasRenderingContext2D, progress: number): v
 }
 
 /**
- * Draw a danger-zone strip at the top of the container.
- * When `dangerLevel` > 0 (0–1 range), the strip pulses red.
- * dangerLevel 0 = no danger (static dim line), 1 = max danger (bright pulsing).
+ * Draw the danger zone at the top of the container.
+ * Only visible when gems are close to the top (dangerLevel > 0).
+ * When overflowProgress > 0, shows a countdown timer bar.
+ *
+ * @param dangerLevel 0–1 how close gems are to the line
+ * @param time elapsed game time (for pulse animation)
+ * @param overflowProgress 0–1 how far through the grace period (0=just started, 1=game over)
  */
 export function drawDangerZone(
   ctx: CanvasRenderingContext2D,
   dangerLevel: number,
   time: number,
+  overflowProgress = 0,
 ): void {
+  // Hidden when no danger
+  if (dangerLevel <= 0 && overflowProgress <= 0) return;
+
   const { containerX, containerY, containerWidth } = GRID;
-  const STRIP_H = 6;
 
   ctx.save();
 
   if (dangerLevel > 0) {
-    // Pulsing red strip — faster pulse at higher danger
-    const pulse = 0.4 + 0.6 * ((Math.sin(time * 8) + 1) / 2);
-    const alpha = 0.15 + 0.45 * dangerLevel * pulse;
-    ctx.fillStyle = `rgba(255, 50, 50, ${alpha})`;
-    ctx.fillRect(containerX, containerY - STRIP_H / 2, containerWidth, STRIP_H);
+    const pulse = 0.4 + 0.6 * ((Math.sin(time * (8 + dangerLevel * 8)) + 1) / 2);
+    const alpha = 0.1 + 0.5 * dangerLevel * pulse;
 
-    // Bright center line
-    ctx.strokeStyle = `rgba(255, 60, 60, ${0.5 + 0.5 * dangerLevel * pulse})`;
+    // Pulsing red strip
+    ctx.fillStyle = `rgba(255, 40, 40, ${alpha * 0.5})`;
+    ctx.fillRect(containerX, containerY - 3, containerWidth, 6);
+
+    // Bright line
+    ctx.strokeStyle = `rgba(255, 50, 50, ${0.3 + 0.7 * dangerLevel * pulse})`;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(containerX, containerY);
     ctx.lineTo(containerX + containerWidth, containerY);
     ctx.stroke();
-  } else {
-    // Dim static line when no danger
-    ctx.strokeStyle = 'rgba(255, 100, 100, 0.15)';
-    ctx.lineWidth = 1;
+
+    // Red screen edge vignette when danger is high
+    if (dangerLevel > 0.5) {
+      const vigAlpha = (dangerLevel - 0.5) * 0.3 * pulse;
+      ctx.fillStyle = `rgba(255, 20, 20, ${vigAlpha.toFixed(3)})`;
+      ctx.fillRect(containerX, containerY, containerWidth, 40);
+    }
+  }
+
+  // Countdown bar when overflow is active
+  if (overflowProgress > 0) {
+    const barW = containerWidth * 0.7;
+    const barH = 8;
+    const barX = containerX + (containerWidth - barW) / 2;
+    const barY = containerY + 12;
+    const remaining = 1 - overflowProgress;
+
+    // Background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
     ctx.beginPath();
-    ctx.moveTo(containerX, containerY);
-    ctx.lineTo(containerX + containerWidth, containerY);
-    ctx.stroke();
+    ctx.roundRect(barX, barY, barW, barH, 4);
+    ctx.fill();
+
+    // Remaining time bar (red → orange → green)
+    const barColor = remaining > 0.5 ? '#f87171' : remaining > 0.25 ? '#FF6B2D' : '#22C55E';
+    ctx.fillStyle = barColor;
+    ctx.beginPath();
+    ctx.roundRect(barX, barY, barW * remaining, barH, 4);
+    ctx.fill();
+
+    // "DANGER" text
+    const textPulse = 0.6 + 0.4 * Math.sin(time * 12);
+    ctx.globalAlpha = textPulse;
+    ctx.font = `bold ${IS_PORTRAIT ? 14 : 12}px monospace`;
+    ctx.fillStyle = '#FF4444';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('DANGER', containerX + containerWidth / 2, barY + barH + 14);
   }
 
   ctx.restore();
@@ -640,6 +744,7 @@ export function drawScoreHUD(
   scoring: Readonly<ScoringState>,
   level = 1,
   pointsLeft = 0,
+  gold = 0,
 ): void {
   const w = VIRTUAL_WIDTH;
   const h = TOP_NAV_H;
@@ -667,9 +772,20 @@ export function drawScoreHUD(
   ctx.textAlign = 'left';
   ctx.fillText('SCORE', 15, labelY);
 
-  ctx.font = `bold ${IS_PORTRAIT ? 16 : 15}px monospace`;
+  ctx.font = `bold ${IS_PORTRAIT ? 14 : 13}px monospace`;
   ctx.fillStyle = ACCENT_GOLD;
   ctx.fillText(scoring.score.toLocaleString(), 15, valueY);
+
+  // -- Left-center: GOLD ------------------------------------------------------
+  const goldX = IS_PORTRAIT ? 150 : 140;
+  ctx.font = `bold 9px monospace`;
+  ctx.fillStyle = '#6b7280';
+  ctx.textAlign = 'left';
+  ctx.fillText('GOLD', goldX, labelY);
+
+  ctx.font = `bold ${IS_PORTRAIT ? 14 : 13}px monospace`;
+  ctx.fillStyle = '#FBBF24';
+  ctx.fillText(gold.toLocaleString(), goldX, valueY);
 
   // -- Center: COMBO when active, otherwise NEXT LVL points remaining ---------
   if (scoring.comboCount >= 2) {
@@ -1196,7 +1312,9 @@ export function drawPhysicsGems(ctx: CanvasRenderingContext2D, bodies: readonly 
     const def = GEM_TIERS[data.tier];
     if (!def) continue;
     const pos = bodyPos(body);
-    drawSingleGem(ctx, pos.x, pos.y, def, 1, 1, data.tier, time, bodyAngle(body), data.rainbow);
+    if (data.bonus) drawBonusAura(ctx, pos.x, pos.y, def.radius, time, 1);
+    if (data.blackhole) drawBlackholeAura(ctx, pos.x, pos.y, def.radius, time);
+    drawSingleGem(ctx, pos.x, pos.y, def, 1, 1, data.tier, time, bodyAngle(body), data.rainbow, data.heavy);
   }
 
   // Draw dragged gem last (on top) with lift effect
@@ -1205,7 +1323,7 @@ export function drawPhysicsGems(ctx: CanvasRenderingContext2D, bodies: readonly 
     const def = GEM_TIERS[drag.tier];
     if (def) {
       const pos = bodyPos(drag.body);
-      drawSingleGem(ctx, pos.x, pos.y, def, DRAG_SCALE, DRAG_ALPHA, drag.tier, time, bodyAngle(drag.body), data?.rainbow ?? false);
+      drawSingleGem(ctx, pos.x, pos.y, def, DRAG_SCALE, DRAG_ALPHA, drag.tier, time, bodyAngle(drag.body), data?.rainbow ?? false, data?.heavy ?? false);
     }
   }
 }
@@ -1268,6 +1386,7 @@ function drawSingleGem(
   time: number = 0,
   angle: number = 0,
   rainbow: boolean = false,
+  heavy: boolean = false,
 ): void {
   const r = def.radius * scale;
 
@@ -1355,5 +1474,50 @@ function drawSingleGem(
     ctx.fill();
   }
 
+  // Heavy gem: dark tint
+  if (heavy) {
+    ctx.globalAlpha = alpha * 0.3;
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+/** Draw a dark pulsing purple vortex behind a blackhole gem. */
+function drawBlackholeAura(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, time: number): void {
+  const pulse = 0.5 + 0.5 * Math.sin(time * 6);
+  const auraR = r + 12 + pulse * 5;
+  ctx.save();
+  ctx.globalAlpha = 0.4 + 0.15 * pulse;
+  const grad = ctx.createRadialGradient(x, y, r * 0.2, x, y, auraR);
+  grad.addColorStop(0, '#1a0030');
+  grad.addColorStop(0.4, '#6B21A8');
+  grad.addColorStop(0.7, '#9333EA');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(x, y, auraR, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Draw a pulsing golden aura behind a bonus gem. Call before drawSingleGem. */
+function drawBonusAura(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, time: number, alpha: number): void {
+  const pulse = 0.5 + 0.5 * Math.sin(time * 4);
+  const auraR = r + 8 + pulse * 4;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = alpha * (0.15 + 0.1 * pulse);
+  const grad = ctx.createRadialGradient(x, y, r * 0.5, x, y, auraR);
+  grad.addColorStop(0, '#FBBF24');
+  grad.addColorStop(0.6, '#FBBF24');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(x, y, auraR, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }

@@ -1,11 +1,14 @@
 import { mergeQueue, pendingBodies } from './mergeDetector';
-import { spawnGem } from './gemSpawner';
+import { spawnGem, getGemData } from './gemSpawner';
+import { GEM_TIERS } from './gems';
+import { getBonusGemSpawnChance, getExplosionChance } from './state';
 import { addMergeAnimation } from './mergeAnimation';
 import { emitMergeBurst } from './particles';
-import { bodyVel, bodyAngVel, bodyMass, bodyId, setVelocity, setAngularVelocity, dynamicBodies, type Body } from '../physics/planckWorld';
+import { bodyVel, bodyAngVel, bodyMass, bodyPos, bodyId, setVelocity, setAngularVelocity, dynamicBodies, type Body } from '../physics/planckWorld';
+import { Vec2 } from 'planck';
 import type { World } from 'planck';
 
-export type MergeCallback = (resultTier: number, rainbow: boolean) => void;
+export type MergeCallback = (resultTier: number, rainbow: boolean, midX: number, midY: number, bonusMerge: boolean, tierSkipped: boolean, bonusGemSpawned: boolean, exploded: boolean) => void;
 
 let _onMerge: MergeCallback | null = null;
 
@@ -29,6 +32,11 @@ export function processMerges(world: World): Body[] {
 
     if (!aExists || !bExists) continue;
 
+    // Check bonus flag before destroying
+    const dataA = getGemData(event.bodyA);
+    const dataB = getGemData(event.bodyB);
+    const bonusMerge = !!(dataA?.bonus || dataB?.bonus);
+
     // Capture momentum before removing sources
     const mA = bodyMass(event.bodyA);
     const mB = bodyMass(event.bodyB);
@@ -45,19 +53,73 @@ export function processMerges(world: World): Body[] {
 
     if (event.nextTier === -1) {
       emitMergeBurst(event.midX, event.midY, 11);
-      _onMerge?.(-1, false);
+      _onMerge?.(-1, false, event.midX, event.midY, bonusMerge, false, false, false);
       continue;
     }
 
-    // Spawn merged gem with conserved momentum
+    // Spawn merged gem with conserved momentum (bonus NOT inherited)
     const newBody = spawnGem(world, event.midX, event.midY, event.nextTier, event.rainbow);
     setVelocity(newBody, avgVx * 0.5, avgVy * 0.5);
     setAngularVelocity(newBody, avgAng * 0.3);
-    addMergeAnimation(newBody, event.midX, event.midY);
+    addMergeAnimation(newBody, event.midX, event.midY, dataA?.tier ?? -1);
     emitMergeBurst(event.midX, event.midY, event.nextTier, event.rainbow);
     spawned.push(newBody);
 
-    _onMerge?.(event.nextTier, event.rainbow);
+    // Bonus gem spawn
+    let bonusGemSpawned = false;
+    const bgsChance = getBonusGemSpawnChance();
+    if (bgsChance > 0 && Math.random() < bgsChance) {
+      const bonusTier = Math.max(0, event.nextTier - 2 - Math.floor(Math.random() * 2));
+      const offsetAngle = Math.random() * Math.PI * 2;
+      const offsetDist = 30 + Math.random() * 20;
+      const bx = event.midX + Math.cos(offsetAngle) * offsetDist;
+      const by = event.midY + Math.sin(offsetAngle) * offsetDist;
+      const bonusBody = spawnGem(world, bx, by, bonusTier);
+      setVelocity(bonusBody, Math.cos(offsetAngle) * 80, Math.sin(offsetAngle) * 80 - 50);
+      spawned.push(bonusBody);
+      bonusGemSpawned = true;
+    }
+
+    // Explosion: push all nearby gems away from merge point
+    let exploded = false;
+    const expChance = getExplosionChance();
+    if (expChance > 0 && Math.random() < expChance) {
+      exploded = true;
+      const tier = event.nextTier;
+      const def = GEM_TIERS[tier];
+      // Radius and force scale with tier
+      const blastRadius = (def?.radius ?? 40) * 3 + tier * 15; // px
+      const blastForce = 150 + tier * 80; // impulse strength
+
+      for (const b of dynamicBodies(world)) {
+        if (b === newBody) continue;
+        if (!getGemData(b)) continue;
+        const bPos = bodyPos(b);
+        const dx = bPos.x - event.midX;
+        const dy = bPos.y - event.midY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > blastRadius || dist < 1) continue;
+
+        // Falloff: closer = stronger push
+        const falloff = 1 - dist / blastRadius;
+        const force = blastForce * falloff * falloff;
+        const nx = dx / dist;
+        const ny = dy / dist;
+        // Wake the body and apply impulse
+        if (!b.isAwake()) b.setAwake(true);
+        b.applyLinearImpulse(
+          Vec2(nx * force / 30 * b.getMass(), ny * force / 30 * b.getMass()),
+          b.getWorldCenter(),
+          true,
+        );
+      }
+
+      // Extra burst particles for the explosion
+      emitMergeBurst(event.midX, event.midY, Math.min(tier + 2, 11), event.rainbow);
+      emitMergeBurst(event.midX, event.midY, Math.min(tier + 1, 11), event.rainbow);
+    }
+
+    _onMerge?.(event.nextTier, event.rainbow, event.midX, event.midY, bonusMerge, event.tierSkipped, bonusGemSpawned, exploded);
   }
 
   return spawned;
