@@ -70,9 +70,13 @@ export function initMergeDetection(world: World): void {
 
       // Tier skip: chance to jump one extra tier (not on max tier or prestige boundary)
       const skipChance = getTierSkipChance();
-      if (skipChance > 0 && Math.random() < skipChance && nextTier < MAX_TIER && GEM_TIERS[nextTier + 1]) {
+      const canSkip = skipChance > 0 && nextTier < MAX_TIER && !!GEM_TIERS[nextTier + 1];
+      const roll = Math.random();
+      console.log(`[MERGE] tier ${dataA.tier}→${nextTier} skipChance=${(skipChance * 100).toFixed(1)}% canSkip=${canSkip} roll=${(roll * 100).toFixed(1)}%`);
+      if (canSkip && roll < skipChance) {
         nextTier = nextTier + 1;
         tierSkipped = true;
+        console.log(`[TIER SKIP] PROC! → tier ${nextTier}`);
       }
     }
 

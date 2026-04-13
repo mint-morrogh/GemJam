@@ -52,7 +52,10 @@ export function setBonusChance(v: number): void { bonusChance = v; }
 /** Chance a merge jumps one extra tier. */
 let tierSkipChance = 0;
 export function getTierSkipChance(): number { return tierSkipChance; }
-export function setTierSkipChance(v: number): void { tierSkipChance = v; }
+export function setTierSkipChance(v: number): void {
+  tierSkipChance = v;
+  console.log(`[TIER SKIP] chance set to ${(v * 100).toFixed(2)}%`);
+}
 
 /** Chance to spawn a black hole gem. */
 let blackholeChance = 0;
