@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { VIRTUAL_WIDTH, IS_PORTRAIT } from '../canvas';
-import { getAutoShakeMobile, setAutoShakeMobile, getMotionDebug } from './levelShake';
+import { getAutoShakeMobile, setAutoShakeMobile } from './levelShake';
 import { getActiveUpgrades } from './shop';
 import { getFireMode, setFireMode } from './input';
 
@@ -32,25 +32,13 @@ function getPanelH(): number {
     h += 24 + ups.length * UPGRADE_ROW_H + 10; // card content
     h += 20; // gap after card
   }
-  // Toggle buttons (mobile): auto-shake + fire mode (+ optional motion error line)
+  // Toggle buttons (mobile): auto-shake + fire mode
   if (IS_MOBILE) {
     h += (BTN_H + 10) * 2 + 6;
-    if (!getAutoShakeMobile() && motionHasError()) h += 18;
   }
   // Restart button
   h += BTN_H + 20;
   return h;
-}
-
-/** True if the motion status is in an error state that warrants an inline notice. */
-function motionHasError(): boolean {
-  const d = getMotionDebug();
-  if (d.status === 'unsupported') return true;
-  if (d.status === 'permission-denied') return true;
-  if (d.status === 'insecure-context' && d.events === 0) return true;
-  if ((d.status === 'awaiting-permission' || d.status === 'gesture-required') && d.events === 0) return true;
-  if (d.status === 'listening' && d.events === 0) return true;
-  return false;
 }
 
 /** These are computed during draw since they depend on content flow. */
@@ -282,31 +270,7 @@ export function drawDropdown(
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`AUTO-SHAKE: ${isAuto ? 'ON' : 'OFF'}`, VIRTUAL_WIDTH / 2, rowY + BTN_H / 2);
-    rowY += BTN_H + 4;
-
-    // Motion error line — only shown when something is wrong. Silent when working.
-    if (!isAuto) {
-      const d = getMotionDebug();
-      let label = '';
-      if (d.status === 'unsupported') label = 'motion sensor unavailable on this device';
-      else if (d.status === 'permission-denied') label = 'motion denied — clear Safari website data';
-      else if (d.status === 'insecure-context' && d.events === 0) label = 'motion needs HTTPS';
-      else if ((d.status === 'awaiting-permission' || d.status === 'gesture-required') && d.events === 0) {
-        label = 'tap anywhere once to enable motion';
-      }
-      else if (d.events === 0 && d.status === 'listening') label = 'motion listener silent — try reloading';
-
-      if (label) {
-        ctx.font = `${IS_PORTRAIT ? 10 : 9}px monospace`;
-        ctx.fillStyle = '#f87171';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(label, VIRTUAL_WIDTH / 2, rowY + 8);
-        rowY += 18;
-      }
-    }
-
-    rowY += 10;
+    rowY += BTN_H + 10;
 
     // -- Fire mode toggle (mobile only) — unrelated to shake, separate row --
     _fireModeY = rowY;
