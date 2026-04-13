@@ -239,9 +239,9 @@ const ITEM_DEFS: ShopItemDef[] = [
     id: 'tier_skip',
     name: 'Tier Skip',
     description: (pct) => `+${pct.toFixed(1)}% chance to skip a tier on merge`,
-    basePct: 1,
+    basePct: 3,
     baseCost: 220,
-    apply: (pct) => setTierSkipChance(Math.min(0.3, getTierSkipChance() + pct / 100)),
+    apply: (pct) => setTierSkipChance(Math.min(0.4, getTierSkipChance() + pct / 100)),
   },
   {
     id: 'bonus_gem_spawn',
