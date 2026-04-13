@@ -200,6 +200,81 @@ export function drawLauncherGem(
 }
 
 /**
+ * Skip-throw button — floats next to the launcher gem. Only visible when the
+ * player has charges. Tapping it discards the current gem and advances the queue.
+ */
+const SKIP_BTN_SIZE = 30;
+
+export function getSkipThrowButtonRect(launchX: number, launchY: number, gemRadius: number): { x: number; y: number; w: number; h: number } {
+  // Upper-right of the launcher gem, outside the physics circle so it never
+  // occludes the gem art.
+  const cx = launchX + gemRadius + 8 + SKIP_BTN_SIZE / 2;
+  const cy = launchY - gemRadius - 4 - SKIP_BTN_SIZE / 2;
+  return { x: cx - SKIP_BTN_SIZE / 2, y: cy - SKIP_BTN_SIZE / 2, w: SKIP_BTN_SIZE, h: SKIP_BTN_SIZE };
+}
+
+export function drawSkipThrowButton(
+  ctx: CanvasRenderingContext2D,
+  launchX: number,
+  launchY: number,
+  gemRadius: number,
+  charges: number,
+  time: number,
+): void {
+  if (charges <= 0) return;
+  const r = getSkipThrowButtonRect(launchX, launchY, gemRadius);
+  const cx = r.x + r.w / 2;
+  const cy = r.y + r.h / 2;
+
+  ctx.save();
+
+  // Soft pulse when a new charge is pending (subtle idle animation).
+  const pulse = 0.5 + 0.5 * Math.sin(time * 2.5);
+
+  // Button background
+  ctx.beginPath();
+  ctx.arc(cx, cy, r.w / 2, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(20, 40, 50, 0.85)';
+  ctx.fill();
+  ctx.strokeStyle = `rgba(103, 232, 249, ${0.5 + pulse * 0.4})`;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Redo arrow glyph (stylized circular arrow)
+  ctx.strokeStyle = '#67E8F9';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(cx, cy, r.w * 0.28, Math.PI * 0.3, Math.PI * 1.85);
+  ctx.stroke();
+  // Arrowhead at the arc's end
+  const endAng = Math.PI * 1.85;
+  const ax = cx + Math.cos(endAng) * r.w * 0.28;
+  const ay = cy + Math.sin(endAng) * r.w * 0.28;
+  ctx.beginPath();
+  ctx.moveTo(ax, ay);
+  ctx.lineTo(ax + 4, ay - 2);
+  ctx.moveTo(ax, ay);
+  ctx.lineTo(ax + 2, ay + 4);
+  ctx.stroke();
+
+  // Charge count badge (top-right of button)
+  const bx = cx + r.w * 0.3;
+  const by = cy - r.w * 0.3;
+  ctx.beginPath();
+  ctx.arc(bx, by, 8, 0, Math.PI * 2);
+  ctx.fillStyle = '#67E8F9';
+  ctx.fill();
+  ctx.fillStyle = '#042f3a';
+  ctx.font = `bold 10px monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`${charges}`, bx, by + 0.5);
+
+  ctx.restore();
+}
+
+/**
  * Draw the animated trajectory line showing the predicted gem path.
  * Dashed line with marching animation, fading toward the tail.
  */

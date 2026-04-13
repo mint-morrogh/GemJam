@@ -217,7 +217,7 @@ export function drawHome(ctx: CanvasRenderingContext2D): void {
 
   // Darkening overlay over the live physics scene — gems stay visible as
   // a subtle backdrop without fighting the UI for attention.
-  ctx.fillStyle = 'rgba(4, 6, 12, 0.7)';
+  ctx.fillStyle = 'rgba(4, 6, 12, 0.78)';
   ctx.fillRect(0, 0, w, h);
 
   // Subtle vignette on top for depth

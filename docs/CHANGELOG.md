@@ -7,7 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Shop upgrades (meta):
+  - **Interest** — % of unspent gold paid out on shop open (caps at 50%, then stops appearing).
+  - **Discount** — % off all shop-item prices (caps at 50%, then stops appearing).
+  - **Free Reroll** — flat unlock, adds 1 free reroll per shop (max 3 purchases).
+  - **Extra Slot** — flat unlock, +1 shop slot (max 2 purchases; shop grows from 6 → 8 cards).
+  - **Extra Lock** — flat unlock, +1 lockable item (max 2 purchases, cap 3 locks). Tapping lock beyond cap evicts oldest lock.
+- Shop upgrades (gameplay):
+  - **Skip Throw** — adds redo charges (4/7/10/13/16 per rarity) that persist across levels. Redo button appears next to the launcher; tap to discard the current gem and pull the next from the queue.
+  - **Rainbow Drop** — tiny, expensive chance that the launcher gem spawns as a rainbow (prestige-tinted). Caps at 2%.
+- Shop framework: `ShopItemDef` now supports `flat` (no rarity scaling), `isAvailable` (filter maxed upgrades out of rolls), and `rarityPct` (custom per-rarity integer counts for things like Skip Throw).
+
+### Changed
+- Shop: Tier Skip base rate lowered from 3% to 2% (rarities scale off basePct, so uncommon is now 3%, rare 4%, epic 6%, legendary 10%).
+
 ### Fixed
+- Overflow timer no longer runs during level-complete interludes (banner, countdown, shake, settle, shop, resume). Previously the player could game-over mid-shake despite being unable to fire. Accumulated timer carries across the interlude rather than resets, so a packed well still reads as danger when play resumes.
+- Game over: "Time Survived" stat no longer keeps ticking up after death. `elapsedTime` now freezes when `state.gameOver` is true.
+- Shop: "Continue Run" from the homepage now correctly re-opens the shop when the save was in the shop phase. The `openShop()` call was gated behind `interludeBlocks`, which the shop phase itself sets — so restoring directly into shop left the player staring at an empty field.
+- Shop: tapping the lock icon no longer occasionally buys the item. The lock hit area was a 22px visual-sized rect; fat-finger taps just outside it fell through to `buyItem`. Hit rect is now padded ~14px while the visual button stays the same size.
 - Auto-shake toggle on mobile: when auto-shake is OFF, random gravity oscillation was still applied — gems shook even with the phone held still. Now only real device motion drives shake gravity when auto-shake is disabled.
 - iOS motion permission was requested from the game-loop countdown (not a user gesture) so it always silently failed. Now requested on the first tap/touch *and* when the user toggles auto-shake OFF — both guaranteed user-gesture contexts.
 - Added on-screen motion readout during shake phase (mobile, auto-shake OFF): shows current magnitude, peak, and event count. Turns red with "MOTION SENSOR BLOCKED" if the listener isn't attached.

@@ -85,16 +85,23 @@ let bonusGemSpawnChance = 0;
 export function getBonusGemSpawnChance(): number { return bonusGemSpawnChance; }
 export function setBonusGemSpawnChance(v: number): void { bonusGemSpawnChance = v; }
 
-export interface SpawnResult { def: GemDef; heavy: boolean; bonus: boolean; blackhole: boolean; }
+/** Chance launcher queues a rainbow-tinted (prestige) gem. */
+let rainbowDropChance = 0;
+export function getRainbowDropChance(): number { return rainbowDropChance; }
+export function setRainbowDropChance(v: number): void { rainbowDropChance = v; }
+
+export interface SpawnResult { def: GemDef; heavy: boolean; bonus: boolean; blackhole: boolean; rainbow: boolean; }
 
 export function randomSpawnGem(): SpawnResult {
   const heavy = heavyChance > 0 && Math.random() < heavyChance;
   const bonus = bonusChance > 0 && Math.random() < bonusChance;
   const blackhole = !heavy && !bonus && blackholeChance > 0 && Math.random() < blackholeChance;
+  // Rainbow drop: independent of variant flags so a Rainbow Heavy is possible.
+  const rainbow = rainbowDropChance > 0 && Math.random() < rainbowDropChance;
   if (garnetChance > 0 && Math.random() < garnetChance) {
-    return { def: GEM_TIERS[MAX_SPAWN_TIER + 1], heavy, bonus, blackhole };
+    return { def: GEM_TIERS[MAX_SPAWN_TIER + 1], heavy, bonus, blackhole, rainbow };
   }
-  return { def: GEM_TIERS[Math.floor(Math.random() * (MAX_SPAWN_TIER + 1))], heavy, bonus, blackhole };
+  return { def: GEM_TIERS[Math.floor(Math.random() * (MAX_SPAWN_TIER + 1))], heavy, bonus, blackhole, rainbow };
 }
 
 function fillQueue(queue: SpawnResult[]): void {

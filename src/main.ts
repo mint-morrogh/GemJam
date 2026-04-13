@@ -2,7 +2,7 @@ import './style.css';
 import { createCanvas, initResize, VIRTUAL_WIDTH, VIRTUAL_HEIGHT } from './canvas';
 import { createWorld, createStaticRect, createCornerArc as createCornerArcBodies, dynamicBodies, bodyPos, bodyVel, setVelocity, setAngularVelocity } from './physics/planckWorld';
 import { startLoop, getStats, FIXED_DT } from './engine/gameLoop';
-import { drawPhysicsGems, drawGemShimmers, drawNextGemPanel, drawDangerZone, drawScoreHUD, drawLauncherGem, drawTrajectory, drawShakeLid, triggerQueueShift, updateQueueAnimation, resetQueueAnimation } from './game/renderer';
+import { drawPhysicsGems, drawGemShimmers, drawNextGemPanel, drawDangerZone, drawScoreHUD, drawLauncherGem, drawTrajectory, drawShakeLid, triggerQueueShift, updateQueueAnimation, resetQueueAnimation, drawSkipThrowButton, getSkipThrowButtonRect } from './game/renderer';
 import { renderGameOver, installGameOverClickHandler, startGameOverAnim, updateGameOverAnim, resetGameOverAnim } from './game/gameOverScreen';
 import { createInputHandler } from './game/input';
 import { createGameState, consumeNextGem, checkOverflow, resetGameState, getDangerLevel } from './game/state';
@@ -28,7 +28,7 @@ import { initHaptics, hapticMerge, hapticExplosion, hapticTierSkip, hapticBlackh
 import { getGameMode, setGameMode } from './game/gameMode';
 import { isHomeOpen, openHome, closeHome, drawHome, handleHomeClick, updateHome, type HomeAction } from './game/homepage';
 import { isDropdownOpen, toggleDropdown, closeDropdown, updateDropdown, isClickInNav, isClickOnRestart, isClickOnBackdrop, handleAutoShakeToggle, handleFireModeToggle, handleHapticsToggle, drawDropdown } from './game/dropdown';
-import { getGold, addGold, goldForTier, spawnGoldText, spawnScoreText, spawnFloatingLabel, updateFloatingText, drawFloatingText, openShop, closeShop, clearShopForNextLevel, isShopOpen, buyItem, rerollShop, getShopClickIndex, isClickOnContinue, isClickOnReroll, drawShop, updateShop, resetShop, getShopSaveData, restoreShopData, getGoldEarnedThisRun, handleShopLockClick } from './game/shop';
+import { getGold, addGold, goldForTier, spawnGoldText, spawnScoreText, spawnFloatingLabel, updateFloatingText, drawFloatingText, openShop, closeShop, clearShopForNextLevel, isShopOpen, buyItem, rerollShop, getShopClickIndex, isClickOnContinue, isClickOnReroll, drawShop, updateShop, resetShop, getShopSaveData, restoreShopData, getGoldEarnedThisRun, handleShopLockClick, consumeLastInterestPaid, getSkipThrowCharges, consumeSkipThrowCharge } from './game/shop';
 import { setOnBlackhole, resetBlackholeTracker, updateBlackholes, drawActiveBlackholes } from './game/blackhole';
 import type { SaveData, GemSnapshot } from './game/persistence';
 import { drawPauseOverlay } from './game/renderer';
@@ -260,7 +260,7 @@ function restoreFromSave(save: SaveData): void {
   state.gemQueue.length = 0;
   for (const tid of save.queue) {
     const def = GEM_TIERS[tid];
-    if (def) state.gemQueue.push({ def, heavy: false, bonus: false, blackhole: false });
+    if (def) state.gemQueue.push({ def, heavy: false, bonus: false, blackhole: false, rainbow: false });
   }
 
   // Restore scoring
@@ -467,6 +467,21 @@ function handleMenuClick(clientX: number, clientY: number): void {
   // the same tap from also triggering shop buys, dropdown toggles, etc.
   if (resumeCooldown > 0) return;
 
+  // Skip-throw redo button — active only when a charge is available and we're
+  // actively playing (no shop/interlude/game-over). Check before the fire
+  // input so a tap on the button doesn't also launch a gem.
+  if (!state.gameOver && !isShopOpen() && !isDropdownOpen() && getShakePhase() === 'playing' && getSkipThrowCharges() > 0) {
+    const sr = getSkipThrowButtonRect(launcher.launchX, launcher.launchY, state.nextGem.def.radius);
+    if (vp.x >= sr.x && vp.x <= sr.x + sr.w && vp.y >= sr.y && vp.y <= sr.y + sr.h) {
+      if (consumeSkipThrowCharge()) {
+        const discarded = consumeNextGem(state);
+        triggerQueueShift(discarded.def);
+        spawnFloatingLabel(launcher.launchX, launcher.launchY - 20, 'SKIPPED', '#67E8F9', 0.9, 14);
+      }
+      return;
+    }
+  }
+
   // Shop clicks take priority
   if (isShopOpen()) {
     // Lock toggle clicks must run before buy clicks (lock button overlaps card)
@@ -521,6 +536,12 @@ input.onFire = (aimX, aimY) => {
   // Player can still fire during danger — countdown only resets when line is clear
   if (getShakePhase() !== 'playing') return;
   if (isDropdownOpen()) return;
+  // Suppress fire when the aim lands on the skip-throw redo button, so clicking
+  // the button doesn't both fire AND skip. Guard matches the render-side visibility.
+  if (getSkipThrowCharges() > 0) {
+    const sr = getSkipThrowButtonRect(launcher.launchX, launcher.launchY, state.nextGem.def.radius);
+    if (aimX >= sr.x && aimX <= sr.x + sr.w && aimY >= sr.y && aimY <= sr.y + sr.h) return;
+  }
 
   const vel = getLaunchVelocity(launcher, aimX, aimY);
   if (!vel) return;
@@ -530,7 +551,7 @@ input.onFire = (aimX, aimY) => {
   const tierIndex = GEM_TIERS.indexOf(spawn.def);
 
   // Spawn physics body at launch point with initial velocity + random spin
-  const body = spawnGem(world, launcher.launchX, launcher.launchY, tierIndex, false, spawn.heavy);
+  const body = spawnGem(world, launcher.launchX, launcher.launchY, tierIndex, spawn.rainbow, spawn.heavy);
   if (spawn.bonus) { const d = getGemData(body); if (d) d.bonus = true; }
   if (spawn.blackhole) { const d = getGemData(body); if (d) d.blackhole = true; }
   setVelocity(body, vel.vx, vel.vy);
@@ -622,7 +643,9 @@ startLoop({
     updateDropdown(_dt);
     updateShop(_dt);
     if (paused) return;
-    elapsedTime += _dt;
+    // Freeze the run timer once the game is over so the "Time Survived" stat
+    // on the game-over screen doesn't keep ticking up while the player reads it.
+    if (!state.gameOver) elapsedTime += _dt;
     fireCooldown = Math.max(0, fireCooldown - _dt);
     resumeCooldown = Math.max(0, resumeCooldown - _dt);
 
@@ -670,6 +693,19 @@ startLoop({
       }
     }
 
+    // Open shop when phase is 'shop' — checked before the interludeBlocks
+    // early-return so a restored save that loads directly into the shop phase
+    // still re-opens the shop UI instead of showing an empty field.
+    if (getShakePhase() === 'shop' && !isShopOpen()) {
+      openShop();
+      // If Interest upgrade paid out on open, show a floating "+N gold (X%)"
+      // in the middle of the shop backdrop for feedback.
+      const bonus = consumeLastInterestPaid();
+      if (bonus > 0) {
+        spawnFloatingLabel(VIRTUAL_WIDTH / 2, VIRTUAL_HEIGHT / 2 - 40, `+${bonus} INTEREST`, '#FBBF24', 2.0, 18);
+      }
+    }
+
     // Skip physics + merges during banner/countdown/resume (but not during shake!)
     if (interludeBlocks) {
       // Still update particles and animations for visual continuity
@@ -696,9 +732,6 @@ startLoop({
     updateBlackholes(_dt);
     updateFloatingText(_dt);
 
-    // Open shop when phase transitions to 'shop'
-    if (getShakePhase() === 'shop' && !isShopOpen()) openShop();
-
     // Expire combo window
     updateCombo(scoring, elapsedTime);
 
@@ -714,21 +747,27 @@ startLoop({
     // Game-over fade-in animation
     updateGameOverAnim(_dt);
 
-    // Overflow detection
-    if (!state.gameOver && checkOverflow(world)) {
-      overflowTimer += _dt;
-      if (overflowTimer >= OVERFLOW_GRACE) {
-        state.gameOver = true;
-        clearSave();
-        resetShop(); // wipe all upgrades immediately — no lingering via blur/save
-        isNewHighScore = saveHighScore(scoring);
-        const result = recordScore(scoring);
-        gameOverHistory = result.history;
-        gameOverRank = result.rank;
-        startGameOverAnim();
+    // Overflow detection — frozen during level interludes (banner, countdown,
+    // shake, settle, shop, resume). The player can't fire to relieve pressure
+    // during those phases, so ticking the game-over timer would be unfair.
+    // The accumulated timer is preserved across the interlude rather than
+    // reset, so shake can't be abused as a "free escape" from a stacked well.
+    if (getShakePhase() === 'playing') {
+      if (!state.gameOver && checkOverflow(world)) {
+        overflowTimer += _dt;
+        if (overflowTimer >= OVERFLOW_GRACE) {
+          state.gameOver = true;
+          clearSave();
+          resetShop(); // wipe all upgrades immediately — no lingering via blur/save
+          isNewHighScore = saveHighScore(scoring);
+          const result = recordScore(scoring);
+          gameOverHistory = result.history;
+          gameOverRank = result.rank;
+          startGameOverAnim();
+        }
+      } else {
+        overflowTimer = 0;
       }
-    } else {
-      overflowTimer = 0;
     }
   },
 
@@ -798,6 +837,10 @@ startLoop({
     // Launcher gem (on top of everything except overlays)
     if (!state.gameOver && !isHomeOpen()) {
       drawLauncherGem(ctx, launcher.launchX, launcher.launchY, state.nextGem.def, elapsedTime, state.nextGem.heavy, state.nextGem.bonus, state.nextGem.blackhole);
+      // Skip-throw redo button — only while playing (hidden during shake/shop/interlude)
+      if (getShakePhase() === 'playing') {
+        drawSkipThrowButton(ctx, launcher.launchX, launcher.launchY, state.nextGem.def.radius, getSkipThrowCharges(), elapsedTime);
+      }
     }
 
     // End screen shake transform
