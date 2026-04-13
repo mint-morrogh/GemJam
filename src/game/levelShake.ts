@@ -262,46 +262,6 @@ export function closeShopPhase(): void {
 // Rendering
 // ---------------------------------------------------------------------------
 
-/**
- * Small persistent motion sensor indicator — always visible on mobile when
- * auto-shake is OFF. Lets the player verify their accelerometer is alive
- * *before* a shake phase begins.
- */
-export function drawMotionIndicator(ctx: CanvasRenderingContext2D): void {
-  if (!IS_MOBILE || autoShakeMobile) return;
-  const d = getMotionDebug();
-
-  const x = 8;
-  const y = VIRTUAL_HEIGHT - 22;
-  ctx.save();
-  ctx.font = `bold 10px monospace`;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-
-  let label: string;
-  let color: string;
-  if (d.status === 'unsupported') { label = 'motion: n/a'; color = '#888'; }
-  else if (d.status === 'awaiting-permission') { label = 'motion: open menu → Enable Motion'; color = '#e8c44a'; }
-  else if (d.status === 'gesture-required') { label = 'motion: open menu → Enable Motion'; color = '#e8c44a'; }
-  else if (d.status === 'permission-denied') { label = 'motion: denied — clear Safari data'; color = '#ff6b6b'; }
-  else if (d.status === 'insecure-context' && d.events === 0) { label = 'motion: needs HTTPS'; color = '#ff6b6b'; }
-  else if (d.events === 0) { label = 'motion: no events (needs HTTPS?)'; color = '#ff6b6b'; }
-  else { label = `motion ✓ ${d.events}evt peak ${d.peak.toFixed(1)}`; color = '#6bff9a'; }
-
-  // Background pill
-  const w = ctx.measureText(label).width + 10;
-  ctx.globalAlpha = 0.75;
-  ctx.fillStyle = '#000';
-  ctx.beginPath();
-  ctx.roundRect(x, y - 8, w, 16, 4);
-  ctx.fill();
-
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = color;
-  ctx.fillText(label, x + 5, y);
-  ctx.restore();
-}
-
 export function drawLevelOverlay(ctx: CanvasRenderingContext2D, _time?: number): void {
   if (ls.phase === 'playing' || ls.phase === 'settling' || ls.phase === 'shop') return;
 

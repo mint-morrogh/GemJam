@@ -28,7 +28,7 @@ export const BASE_MULTIPLIER = 1;
 /** Seconds after a merge during which the next merge still counts as a combo. */
 import { getComboWindowBonus } from './shop';
 
-const BASE_COMBO_WINDOW = 1.5;
+const BASE_COMBO_WINDOW = 1.0;
 /** Effective combo window including shop upgrades. */
 export function getComboWindow(): number { return BASE_COMBO_WINDOW + getComboWindowBonus(); }
 

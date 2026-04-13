@@ -32,10 +32,10 @@ function getPanelH(): number {
     h += 24 + ups.length * UPGRADE_ROW_H + 10; // card content
     h += 20; // gap after card
   }
-  // Toggle buttons (mobile): auto-shake + fire mode (+ motion enable when needed)
+  // Toggle buttons (mobile): auto-shake + fire mode (plus motion status line when auto-shake is off)
   if (IS_MOBILE) {
     h += (BTN_H + 10) * 2 + 6;
-    if (motionButtonVisible()) h += BTN_H + 10;
+    if (!getAutoShakeMobile()) h += 18; // inline motion status line
   }
   // Restart button
   h += BTN_H + 20;
@@ -45,17 +45,10 @@ function getPanelH(): number {
 /** These are computed during draw since they depend on content flow. */
 let _toggleY = 0;
 let _fireModeY = 0;
-let _motionBtnY = 0;
 let _restartBtnY = 0;
 function getRestartBtnY(): number { return _restartBtnY; }
 function getToggleY(): number { return _toggleY; }
 
-/** Is the "ENABLE MOTION" button currently relevant (not yet granted)? */
-function motionButtonVisible(): boolean {
-  if (!IS_MOBILE) return false;
-  const s = getMotionDebug().status;
-  return s === 'awaiting-permission' || s === 'gesture-required' || s === 'permission-denied';
-}
 
 // ---------------------------------------------------------------------------
 // State
@@ -120,6 +113,10 @@ export function isClickOnAutoShake(vx: number, vy: number): boolean {
 /** Handle auto-shake toggle click. Returns true if handled. */
 export function handleAutoShakeToggle(vx: number, vy: number): boolean {
   if (!isClickOnAutoShake(vx, vy)) return false;
+  // Any tap on the shake toggle = user engagement with motion settings.
+  // Request permission eagerly — this runs in user-gesture context (touchend),
+  // which iOS requires. No-op if already granted or unsupported.
+  ensureMotionPermission();
   setAutoShakeMobile(!getAutoShakeMobile());
   return true;
 }
@@ -129,21 +126,6 @@ export function isClickOnFireMode(vx: number, vy: number): boolean {
   if (!IS_MOBILE || ds.progress < 0.9) return false;
   return vx >= BTN_X && vx <= BTN_X + BTN_W &&
     vy >= _fireModeY && vy <= _fireModeY + BTN_H;
-}
-
-/** Check if click hits the enable-motion button. */
-export function isClickOnEnableMotion(vx: number, vy: number): boolean {
-  if (!IS_MOBILE || ds.progress < 0.9 || _motionBtnY < 0) return false;
-  return vx >= BTN_X && vx <= BTN_X + BTN_W &&
-    vy >= _motionBtnY && vy <= _motionBtnY + BTN_H;
-}
-
-/** Handle enable-motion click. Returns true if handled. MUST run in tap context. */
-export function handleEnableMotionClick(vx: number, vy: number): boolean {
-  if (!isClickOnEnableMotion(vx, vy)) return false;
-  // Call synchronously from this tap handler — iOS needs a real user gesture.
-  ensureMotionPermission();
-  return true;
 }
 
 /** Handle fire mode toggle click. Returns true if handled. */
@@ -273,7 +255,7 @@ export function drawDropdown(
     rowY += cardH + 10;
   }
 
-  // -- Auto-shake toggle (mobile only) — flows after content --
+  // -- Shake settings group (mobile only) — auto-shake toggle + motion status --
   if (IS_MOBILE) {
     rowY += 6;
     _toggleY = rowY;
@@ -292,9 +274,33 @@ export function drawDropdown(
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`AUTO-SHAKE: ${isAuto ? 'ON' : 'OFF'}`, VIRTUAL_WIDTH / 2, rowY + BTN_H / 2);
-    rowY += BTN_H + 10;
+    rowY += BTN_H + 4;
 
-    // -- Fire mode toggle (mobile only) --
+    // Motion status line (only when auto-shake is OFF and motion matters)
+    if (!isAuto) {
+      const d = getMotionDebug();
+      let label: string;
+      let color: string;
+      if (d.status === 'unsupported') { label = 'motion sensor unavailable'; color = '#888'; }
+      else if (d.status === 'awaiting-permission' || d.status === 'gesture-required') {
+        label = 'tap AUTO-SHAKE to prompt for motion'; color = '#e8c44a';
+      }
+      else if (d.status === 'permission-denied') { label = 'motion denied — clear Safari website data'; color = '#f87171'; }
+      else if (d.status === 'insecure-context' && d.events === 0) { label = 'motion needs HTTPS (try GitHub Pages build)'; color = '#f87171'; }
+      else if (d.events === 0) { label = 'motion listener attached but no events'; color = '#f87171'; }
+      else { label = `motion ✓  peak ${d.peak.toFixed(1)}  ${d.events} events`; color = '#4ade80'; }
+
+      ctx.font = `${IS_PORTRAIT ? 10 : 9}px monospace`;
+      ctx.fillStyle = color;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, VIRTUAL_WIDTH / 2, rowY + 8);
+      rowY += 18;
+    }
+
+    rowY += 10;
+
+    // -- Fire mode toggle (mobile only) — unrelated to shake, separate row --
     _fireModeY = rowY;
     const isHold = getFireMode() === 'holdrelease';
     ctx.beginPath();
@@ -311,30 +317,6 @@ export function drawDropdown(
     ctx.textBaseline = 'middle';
     ctx.fillText(`FIRE: ${isHold ? 'HOLD & RELEASE' : 'MULTI-TAP'}`, VIRTUAL_WIDTH / 2, rowY + BTN_H / 2);
     rowY += BTN_H + 10;
-
-    // -- Enable Motion button (mobile only, shows only when permission needed) --
-    if (motionButtonVisible()) {
-      _motionBtnY = rowY;
-      const motionStatus = getMotionDebug().status;
-      const denied = motionStatus === 'permission-denied';
-      ctx.beginPath();
-      ctx.roundRect(BTN_X, rowY, BTN_W, BTN_H, btnR);
-      ctx.fillStyle = denied ? 'rgba(220, 38, 38, 0.15)' : 'rgba(232, 196, 74, 0.15)';
-      ctx.fill();
-      ctx.strokeStyle = denied ? 'rgba(220, 38, 38, 0.4)' : 'rgba(232, 196, 74, 0.45)';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
-      ctx.font = `bold ${IS_PORTRAIT ? 12 : 10}px monospace`;
-      ctx.fillStyle = denied ? '#f87171' : '#e8c44a';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const label = denied ? 'DENIED — CLEAR SAFARI DATA' : 'TAP TO ENABLE MOTION';
-      ctx.fillText(label, VIRTUAL_WIDTH / 2, rowY + BTN_H / 2);
-      rowY += BTN_H + 10;
-    } else {
-      _motionBtnY = -1; // not visible
-    }
   }
 
   // -- Restart button — always last --
