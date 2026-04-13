@@ -68,7 +68,9 @@ const IS_MOBILE = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 // ---------------------------------------------------------------------------
 
 let motionMagnitude = 0;
-let motionPermissionRequested = false;
+let motionListenerAttached = false;
+let motionEventsReceived = 0; // debug counter — nonzero proves listener is firing
+let motionPeak = 0; // highest magnitude seen — for HUD readout
 /** User preference: use auto-shake on mobile instead of device motion. */
 let autoShakeMobile = (() => {
   try { return localStorage.getItem('gemjam_autoshake') === '1'; } catch { return false; }
@@ -78,46 +80,71 @@ export function getAutoShakeMobile(): boolean { return autoShakeMobile; }
 export function setAutoShakeMobile(v: boolean): void {
   autoShakeMobile = v;
   try { localStorage.setItem('gemjam_autoshake', v ? '1' : '0'); } catch { /* */ }
+  // When user turns auto-shake OFF, they want device motion — make sure permission
+  // is granted. This runs from a tap handler (user gesture), which iOS requires.
+  if (!v) ensureMotionPermission();
+}
+
+/** Debug readout: motion status for HUD. */
+export function getMotionDebug(): { attached: boolean; events: number; peak: number; current: number } {
+  return { attached: motionListenerAttached, events: motionEventsReceived, peak: motionPeak, current: motionMagnitude };
 }
 
 function handleMotion(e: DeviceMotionEvent): void {
+  motionEventsReceived++;
   const a = e.accelerationIncludingGravity;
   if (!a) return;
   const mag = Math.sqrt((a.x ?? 0) ** 2 + (a.y ?? 0) ** 2 + (a.z ?? 0) ** 2);
   // Subtract baseline gravity (~9.8), low threshold so gentle shakes register
-  motionMagnitude = Math.max(0, mag - 7);
+  motionMagnitude = Math.max(0, mag - 9);
+  if (motionMagnitude > motionPeak) motionPeak = motionMagnitude;
+}
+
+function attachMotionListener(): void {
+  if (motionListenerAttached) return;
+  window.addEventListener('devicemotion', handleMotion);
+  motionListenerAttached = true;
 }
 
 /** Start listening for device motion (call once at init). */
 export function initShakeDetection(): void {
   if (!IS_MOBILE || typeof DeviceMotionEvent === 'undefined') return;
 
-  // iOS 13+ requires explicit permission
+  // iOS 13+ requires explicit permission from a user gesture — defer that.
   const DME = DeviceMotionEvent as any;
-  if (typeof DME.requestPermission === 'function') {
-    // Can't request until a user gesture — we'll try on first shake countdown
-    return;
-  }
-  window.addEventListener('devicemotion', handleMotion);
+  if (typeof DME.requestPermission === 'function') return;
+
+  // Android/others: attach immediately. Note: devicemotion events may not fire
+  // outside a secure context (HTTPS or localhost) on recent browsers.
+  attachMotionListener();
 }
 
-/** Request iOS motion permission (must be called from a user gesture). */
-export async function requestMotionPermission(): Promise<boolean> {
+/**
+ * Request iOS motion permission. MUST be called synchronously from a user
+ * gesture handler (tap/click). Calling from a timer or async chain will fail.
+ */
+export async function ensureMotionPermission(): Promise<boolean> {
+  if (!IS_MOBILE || typeof DeviceMotionEvent === 'undefined') return false;
+  if (motionListenerAttached) return true;
+
   const DME = DeviceMotionEvent as any;
-  if (typeof DME.requestPermission !== 'function') return true; // not needed
+  if (typeof DME.requestPermission !== 'function') {
+    // Non-iOS: just attach
+    attachMotionListener();
+    return true;
+  }
   try {
     const result = await DME.requestPermission();
     if (result === 'granted') {
-      window.addEventListener('devicemotion', handleMotion);
+      attachMotionListener();
       return true;
     }
-  } catch { /* denied or error */ }
-  // Don't override user preference — only default to auto if never set
-  if (!localStorage.getItem('gemjam_autoshake')) {
-    setAutoShakeMobile(true);
-  }
+  } catch { /* denied, or not called from user gesture */ }
   return false;
 }
+
+/** Legacy alias kept for callers. Prefer `ensureMotionPermission`. */
+export const requestMotionPermission = ensureMotionPermission;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -212,11 +239,6 @@ export function updateLevelShake(dt: number): boolean {
 
     case 'countdown':
       ls.countdownNum = 3 - Math.floor(ls.phaseTimer);
-      // Request iOS motion permission on first countdown tick (needs user gesture context)
-      if (ls.phaseTimer < dt * 2 && IS_MOBILE && !motionPermissionRequested) {
-        motionPermissionRequested = true;
-        requestMotionPermission();
-      }
       if (ls.phaseTimer >= 3) {
         ls.phase = 'shaking';
         ls.phaseTimer = 0;
@@ -447,6 +469,18 @@ export function drawLevelOverlay(ctx: CanvasRenderingContext2D, _time?: number):
       barGrad.addColorStop(1, '#e8c44a');
       ctx.fillStyle = barGrad;
       ctx.fill();
+
+      // --- Motion debug readout (mobile + auto-shake OFF only) ---
+      if (IS_MOBILE && !autoShakeMobile) {
+        const d = getMotionDebug();
+        ctx.globalAlpha = 0.9;
+        ctx.font = `bold 11px monospace`;
+        ctx.fillStyle = d.attached ? '#6bff9a' : '#ff6b6b';
+        const status = d.attached
+          ? `MOTION: ${d.current.toFixed(1)}  peak ${d.peak.toFixed(1)}  (${d.events} evt)`
+          : `MOTION SENSOR BLOCKED — enable in browser settings / use HTTPS`;
+        ctx.fillText(status, cx, barY + barH + 18);
+      }
 
       break;
     }

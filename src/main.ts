@@ -22,7 +22,7 @@ import { startProfiling, recordFrame, drawPerfOverlay } from './game/perfProfile
 import { autoDetectQuality, feedFrameTime, updateTransition, shouldRenderEffects } from './game/renderConfig';
 import { getBoardCache } from './game/boardCache';
 import { writeSave, readSave, clearSave } from './game/persistence';
-import { initShakeDetection, checkLevelUp, updateLevelShake, getShakeGravity, getShakePhase, getCurrentLevel, pointsToNextLevel, getLidProgress, resetLevelShake, setLevel, closeShopPhase, drawLevelOverlay } from './game/levelShake';
+import { initShakeDetection, ensureMotionPermission, checkLevelUp, updateLevelShake, getShakeGravity, getShakePhase, getCurrentLevel, pointsToNextLevel, getLidProgress, resetLevelShake, setLevel, closeShopPhase, drawLevelOverlay } from './game/levelShake';
 import { isDropdownOpen, toggleDropdown, closeDropdown, updateDropdown, isClickInNav, isClickOnRestart, isClickOnBackdrop, handleAutoShakeToggle, handleFireModeToggle, drawDropdown } from './game/dropdown';
 import { getGold, addGold, goldForTier, spawnGoldText, spawnScoreText, spawnFloatingLabel, updateFloatingText, drawFloatingText, openShop, closeShop, clearShopForNextLevel, isShopOpen, buyItem, rerollShop, getShopClickIndex, isClickOnContinue, isClickOnReroll, drawShop, resetShop, getShopSaveData, restoreShopData } from './game/shop';
 import { setOnBlackhole, resetBlackholeTracker, updateBlackholes, drawActiveBlackholes } from './game/blackhole';
@@ -51,6 +51,22 @@ document.body.appendChild(rotatePrompt);
 // -- Load persisted settings ------------------------------------------------
 loadSettings();
 initShakeDetection();
+
+// iOS 13+ requires requestPermission() from a user gesture. Request on the
+// first tap/click anywhere — guaranteed user-gesture context.
+const firstTapMotionHook = () => {
+  ensureMotionPermission();
+  window.removeEventListener('pointerdown', firstTapMotionHook);
+  window.removeEventListener('touchstart', firstTapMotionHook);
+};
+window.addEventListener('pointerdown', firstTapMotionHook, { once: false });
+window.addEventListener('touchstart', firstTapMotionHook, { once: false });
+
+// Warn if not in secure context — devicemotion is blocked on http:// for many
+// modern browsers (iOS Safari especially).
+if (typeof window !== 'undefined' && !window.isSecureContext && ('ontouchstart' in window)) {
+  console.warn('[GemJam] Page is NOT a secure context (HTTPS/localhost). Device motion sensors may be disabled by the browser. Serve over HTTPS for mobile shake detection.');
+}
 
 // -- Planck.js (Box2D) physics world ----------------------------------------
 const world = createWorld(25); // gravity 25 m/s² — snappy game feel

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Auto-shake toggle on mobile: when auto-shake is OFF, random gravity oscillation was still applied — gems shook even with the phone held still. Now only real device motion drives shake gravity when auto-shake is disabled.
+- iOS motion permission was requested from the game-loop countdown (not a user gesture) so it always silently failed. Now requested on the first tap/touch *and* when the user toggles auto-shake OFF — both guaranteed user-gesture contexts.
+- Added on-screen motion readout during shake phase (mobile, auto-shake OFF): shows current magnitude, peak, and event count. Turns red with "MOTION SENSOR BLOCKED" if the listener isn't attached.
+- Console warning when page is not a secure context (HTTPS / localhost) — required for `devicemotion` on recent iOS Safari and Chrome.
+- Raised the gravity baseline subtraction from 7 to 9 (closer to true 9.8 gravity) so "still" actually reads as zero.
 
 ### Changed
 - Replaced procedural pixel-art gem sprites with 12 photo-quality sphere PNGs (pebble + tier1-11)
