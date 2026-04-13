@@ -597,6 +597,7 @@ export function getShopClickIndex(vx: number, vy: number): number {
 
 /**
  * Toggle lock on the clicked shop item. Returns true if a lock button was hit.
+ * Only one item can be locked at a time — locking another clears the previous.
  * Bought items can't be locked; mid-unlock-animation items can't be locked.
  */
 export function handleShopLockClick(vx: number, vy: number): boolean {
@@ -607,7 +608,16 @@ export function handleShopLockClick(vx: number, vy: number): boolean {
       const item = shopItems[i];
       if (item.bought) return true; // swallow click but do nothing
       if (item.unlockAnim > 0) return true; // can't relock during animation
-      item.locked = !item.locked;
+      if (item.locked) {
+        // Tapping the already-locked item unlocks it.
+        item.locked = false;
+      } else {
+        // Lock this one, clear any other lock first.
+        for (const other of shopItems) {
+          if (other !== item && other.locked) other.locked = false;
+        }
+        item.locked = true;
+      }
       return true;
     }
   }

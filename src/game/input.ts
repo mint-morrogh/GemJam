@@ -38,6 +38,12 @@ export interface InputHandler {
   readonly aim: Readonly<AimState>;
   /** Callback fired when the player fires (left-click on PC, second-finger tap on mobile). */
   onFire: ((aimX: number, aimY: number) => void) | null;
+  /**
+   * Cancel the current aim if any is in progress. Used when a tap is being
+   * consumed by a different system (e.g. tap-to-resume from pause) so the
+   * lingering touch doesn't fire on release in hold-and-release mode.
+   */
+  cancelAim: () => void;
   /** Remove all event listeners. */
   destroy: () => void;
 }
@@ -137,6 +143,11 @@ export function createInputHandler(canvas: HTMLCanvasElement): InputHandler {
     aim.active = false;
   }
 
+  function cancelAim(): void {
+    aimTouchId = null;
+    aim.active = false;
+  }
+
   // --- Visibility guard ------------------------------------------------------
 
   function handleVisibilityChange(): void {
@@ -160,6 +171,7 @@ export function createInputHandler(canvas: HTMLCanvasElement): InputHandler {
     get aim() { return aim; },
     get onFire() { return onFire; },
     set onFire(fn) { onFire = fn; },
+    cancelAim,
     destroy() {
       canvas.removeEventListener('pointermove', handlePointerMove);
       canvas.removeEventListener('pointerdown', handlePointerDown);

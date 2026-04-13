@@ -102,9 +102,9 @@ export function updateHome(dt: number): void {
 
 function spawnSparkle(): void {
   const cx = VIRTUAL_WIDTH / 2;
-  // Roughly the title bounding box — width scales with title font size
+  // Roughly the title bounding box — must stay in sync with drawMain's titleY
   const titleSize = IS_PORTRAIT ? 64 : 56;
-  const titleY = IS_PORTRAIT ? VIRTUAL_HEIGHT * 0.18 : VIRTUAL_HEIGHT * 0.16;
+  const titleY = IS_PORTRAIT ? VIRTUAL_HEIGHT * 0.13 : VIRTUAL_HEIGHT * 0.11;
   const halfW = titleSize * 2.2; // ~width of "GEMJAM" at this font
   const halfH = titleSize * 0.7;
   state.sparkles.push({
@@ -146,8 +146,8 @@ function mainButtonRects(): { label: string; x: number; y: number; w: number; h:
 }
 
 function modeCardRects(): { mode: GameMode; x: number; y: number; w: number; h: number }[] {
-  const cardW = IS_PORTRAIT ? 280 : 260;
-  const cardH = IS_PORTRAIT ? 130 : 110;
+  const cardW = IS_PORTRAIT ? 300 : 280;
+  const cardH = IS_PORTRAIT ? 150 : 130;
   const gap = 18;
   const totalH = cardH * 2 + gap;
   const startY = VIRTUAL_HEIGHT / 2 - totalH / 2 + 20;
@@ -215,9 +215,9 @@ export function drawHome(ctx: CanvasRenderingContext2D): void {
 
   ctx.save();
 
-  // Heavy darkening overlay over the live physics scene behind us —
-  // gems still visible but pushed way back so the UI reads clearly.
-  ctx.fillStyle = 'rgba(4, 6, 12, 0.86)';
+  // Darkening overlay over the live physics scene — gems stay visible as
+  // a subtle backdrop without fighting the UI for attention.
+  ctx.fillStyle = 'rgba(4, 6, 12, 0.7)';
   ctx.fillRect(0, 0, w, h);
 
   // Subtle vignette on top for depth
@@ -240,16 +240,11 @@ export function drawHome(ctx: CanvasRenderingContext2D): void {
 function drawMain(ctx: CanvasRenderingContext2D): void {
   const cx = VIRTUAL_WIDTH / 2;
 
-  // Title — GEMJAM. Positioned higher so it doesn't crowd the buttons.
-  const titleY = IS_PORTRAIT ? VIRTUAL_HEIGHT * 0.18 : VIRTUAL_HEIGHT * 0.16;
+  // Title — GEMJAM. Positioned near the top so scores and buttons breathe.
+  const titleY = IS_PORTRAIT ? VIRTUAL_HEIGHT * 0.13 : VIRTUAL_HEIGHT * 0.11;
   const titleSize = IS_PORTRAIT ? 64 : 56;
 
-  // Pulsing glow under the title (breathing warmth)
-  const glowPulse = 22 + Math.sin(state.elapsed * 2) * 8;
-
   ctx.save();
-  ctx.shadowColor = '#e8c44a';
-  ctx.shadowBlur = glowPulse;
   ctx.font = `bold ${titleSize}px monospace`;
   const grad = ctx.createLinearGradient(0, titleY - titleSize / 2, 0, titleY + titleSize / 2);
   grad.addColorStop(0, '#FBBF24');
@@ -263,38 +258,61 @@ function drawMain(ctx: CanvasRenderingContext2D): void {
 
   // Current mode + high score
   const mode = getGameMode();
-  const hs = loadHighScore(mode);
-  ctx.font = `11px monospace`;
+
+  // Mode indicator under the title
+  ctx.font = `bold 13px monospace`;
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+  ctx.fillText(`${gameModeLabel(mode).toUpperCase()} MODE`, cx, titleY + titleSize * 0.8);
+
+  // Top 3 scores for this mode — laid out in three tabular columns
+  // (rank · score · date) so every row aligns cleanly.
+  const history = loadScoreHistory(mode).slice(0, 3);
+  const lbY = titleY + titleSize * 0.8 + 46;
+  ctx.font = `bold 13px monospace`;
+  ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-  ctx.fillText(`${gameModeLabel(mode).toUpperCase()} MODE`, cx, titleY + titleSize * 0.7);
-  ctx.font = `bold 14px monospace`;
-  ctx.fillStyle = '#e8c44a';
-  ctx.fillText(hs > 0 ? `High Score ${hs.toLocaleString()}` : 'No high score yet', cx, titleY + titleSize * 0.7 + 20);
+  ctx.fillText('TOP SCORES', cx, lbY);
+
+  if (history.length === 0) {
+    ctx.font = `13px monospace`;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.textAlign = 'center';
+    ctx.fillText('No scores yet', cx, lbY + 24);
+  } else {
+    // Column x positions, all relative to center. Using monospace so rank
+    // numerals align by digit width; score is right-aligned so commas/1000s
+    // stack, date is left-aligned so slashes sit together.
+    const rankX  = cx - 90;           // "1."  "2."  "3."   (left-aligned)
+    const scoreX = cx + 30;           //         "12,345"   (right-aligned)
+    const dateX  = cx + 45;           //         "4/13"     (left-aligned)
+
+    ctx.font = `13px monospace`;
+    for (let i = 0; i < history.length; i++) {
+      const e = history[i];
+      const d = new Date(e.date);
+      const rowY = lbY + 24 + i * 20;
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.fillText(`${i + 1}.`, rankX, rowY);
+
+      ctx.textAlign = 'right';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.fillText(e.score.toLocaleString(), scoreX, rowY);
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.fillText(`${d.getMonth() + 1}/${d.getDate()}`, dateX, rowY);
+    }
+    // Restore centered alignment for anything rendered after the block
+    ctx.textAlign = 'center';
+  }
 
   // Buttons
   const btns = mainButtonRects();
   for (const btn of btns) {
     const isPrimary = btn.id === 'continue' || (!state.hasSave && btn.id === 'new-run');
     drawButton(ctx, btn.x, btn.y, btn.w, btn.h, btn.label, isPrimary);
-  }
-
-  // Recent scores peek — small list, top 3 of current mode
-  const history = loadScoreHistory(mode).slice(0, 3);
-  if (history.length > 0) {
-    const lbY = btns[btns.length - 1].y + btns[btns.length - 1].h + 28;
-    ctx.font = `bold 10px monospace`;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.fillText('TOP SCORES', cx, lbY);
-    for (let i = 0; i < history.length; i++) {
-      const e = history[i];
-      const d = new Date(e.date);
-      ctx.font = `11px monospace`;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
-      ctx.fillText(
-        `${i + 1}. ${e.score.toLocaleString()}  ${e.bestCombo}x  ${d.getMonth() + 1}/${d.getDate()}`,
-        cx, lbY + 18 + i * 16,
-      );
-    }
   }
 }
 
@@ -329,10 +347,10 @@ function drawModes(ctx: CanvasRenderingContext2D): void {
     ctx.fillStyle = isSelected ? '#FBBF24' : '#ffffff';
     ctx.fillText(gameModeLabel(card.mode).toUpperCase(), card.x + 18, card.y + 28);
 
-    // Blurb
+    // Blurb — word-wrapped so long descriptions stay inside the card
     ctx.font = `11px monospace`;
     ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
-    ctx.fillText(gameModeBlurb(card.mode), card.x + 18, card.y + 52);
+    wrapTextLeft(ctx, gameModeBlurb(card.mode), card.x + 18, card.y + 52, card.w - 36, 14);
 
     // High score badge
     ctx.font = `bold 11px monospace`;
@@ -410,6 +428,25 @@ function drawSparkles(ctx: CanvasRenderingContext2D): void {
   }
 }
 
+/** Draw left-aligned word-wrapped text. Uses the caller's current font + fill. */
+function wrapTextLeft(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number): void {
+  ctx.textAlign = 'left';
+  const words = text.split(' ');
+  let line = '';
+  let lineIdx = 0;
+  for (const word of words) {
+    const test = line ? line + ' ' + word : word;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      ctx.fillText(line, x, y + lineIdx * lineHeight);
+      line = word;
+      lineIdx++;
+    } else {
+      line = test;
+    }
+  }
+  if (line) ctx.fillText(line, x, y + lineIdx * lineHeight);
+}
+
 function drawButton(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, label: string, primary: boolean): void {
   ctx.save();
   ctx.beginPath();
@@ -417,9 +454,10 @@ function drawButton(ctx: CanvasRenderingContext2D, x: number, y: number, w: numb
   if (primary) {
     ctx.shadowColor = '#22C55E';
     ctx.shadowBlur = 14;
-    ctx.fillStyle = 'rgba(34, 197, 94, 0.85)';
+    ctx.fillStyle = 'rgba(34, 197, 94, 0.92)';
   } else {
-    ctx.fillStyle = 'rgba(140, 180, 230, 0.12)';
+    // Solid dark-gray panel so buttons read as buttons, not ghostly frames.
+    ctx.fillStyle = '#1f2937';
   }
   ctx.fill();
   ctx.shadowBlur = 0;

@@ -313,6 +313,14 @@ openHome(canContinue);
  * - 'select-mode': mode was changed; no transition needed here.
  */
 function processHomeAction(action: HomeAction): void {
+  // The tap that triggered this action may still be in progress (finger
+  // still down in hold-and-release mode). Cancel the in-flight aim + set
+  // a resume cooldown so the eventual touchend/click can't launch a gem
+  // or hit a shop button on the way out. handleResume skipped these
+  // because home was open when the tap started.
+  input.cancelAim();
+  resumeCooldown = 0.5;
+
   if (action.type === 'continue') {
     if (pendingSave && !pendingSave.gameOver) {
       // Restore the mode the save was running in (default to classic if absent)
@@ -324,15 +332,15 @@ function processHomeAction(action: HomeAction): void {
       restoreFromSave(pendingSave);
     }
     closeHome();
-    paused = false;
+    // Stay paused — shows the pause overlay, same flow as resume-from-blur.
+    paused = true;
     return;
   }
   if (action.type === 'new-run') {
     clearSave();
     scoring.highScore = loadHighScore();
-    restartGame();
+    restartGame(); // already sets paused = true + resumeCooldown + cancelAim
     closeHome();
-    paused = false;
     return;
   }
   // 'select-mode': user picked a mode on the mode screen. setGameMode was
@@ -373,7 +381,10 @@ function handleResume(e: Event): void {
   if (!paused) return;
   if (isHomeOpen()) return; // home handles its own clicks
   paused = false;
-  resumeCooldown = 0.3; // block firing for 300ms after resume
+  resumeCooldown = 0.5; // block firing + menu clicks for 500ms after resume
+  // If touch already started an aim (hold-and-release), discard it so the
+  // lingering finger doesn't fire on release.
+  input.cancelAim();
   e.stopImmediatePropagation();
   e.preventDefault();
 }
@@ -384,6 +395,14 @@ canvas.addEventListener('touchstart', handleResume, { capture: true });
 /** Remove all gem bodies from the physics world, reset state, clear allGems. */
 function restartGame(): void {
   clearSave();
+
+  // Block the tap that initiated the restart from instantly firing / buying.
+  // The same touch may continue into a hold-and-release fire or a shop click;
+  // resumeCooldown guards onFire and handleMenuClick, and cancelAim() wipes
+  // any aim the touch already registered.
+  paused = true;
+  resumeCooldown = 0.5;
+  input.cancelAim();
 
   // Remove ALL gem bodies from Planck world
   for (const b of dynamicBodies(world)) {
@@ -443,6 +462,10 @@ function handleMenuClick(clientX: number, clientY: number): void {
     if (action) processHomeAction(action);
     return;
   }
+
+  // Block menu clicks during the brief window after unpause/restart — stops
+  // the same tap from also triggering shop buys, dropdown toggles, etc.
+  if (resumeCooldown > 0) return;
 
   // Shop clicks take priority
   if (isShopOpen()) {
@@ -521,20 +544,23 @@ input.onFire = (aimX, aimY) => {
 // Random low-tier gems drop into the well while the home is open, merge
 // naturally, and fill it up. When it overflows we clear and restart the cycle.
 let homeDemoSpawnTimer = 0;
+let homeOverflowTimer = 0;
 
 function spawnHomeDemoGem(): void {
   // Random tier 0-3 (spawn range — matches gameplay's MAX_SPAWN_TIER).
   const tier = Math.floor(Math.random() * 4);
-  // Pick a random X across the well width, with a margin so the gem doesn't
-  // clip the wall. Drop from above the top so the entry looks natural.
+  // Spawn INSIDE the well near the top so the gem isn't counted as
+  // "overflowing" on frame 1 — checkOverflow treats any gem above CY as
+  // overflow. Starting below the line and giving it a small downward push
+  // makes it clearly a falling gem, not a stuck one at the overflow line.
   const margin = 30;
   const x = CX + margin + Math.random() * (CW - margin * 2);
-  const y = CY - 30;
+  const y = CY + 20;
   const body = spawnGem(world, x, y, tier, false, false);
   // Tiny spin for visual variety
   setAngularVelocity(body, (Math.random() - 0.5) * 0.2);
-  // Slight horizontal drift so gems don't stack in a perfect column
-  setVelocity(body, (Math.random() - 0.5) * 60, 0);
+  // Slight horizontal drift + small downward velocity
+  setVelocity(body, (Math.random() - 0.5) * 60, 40 + Math.random() * 40);
 }
 
 function clearHomeDemoWorld(): void {
@@ -563,9 +589,16 @@ function runHomeDemo(dt: number): void {
     homeDemoSpawnTimer = 0.3 + Math.random() * 0.35;
   }
 
-  // Reset the well when it overflows — creates an endlessly-shifting backdrop
+  // Reset the well only after overflow persists — same grace logic as
+  // gameplay, so mid-flight gems aren't wiped out the instant they appear.
   if (checkOverflow(world)) {
-    clearHomeDemoWorld();
+    homeOverflowTimer += dt;
+    if (homeOverflowTimer >= 2.0) {
+      clearHomeDemoWorld();
+      homeOverflowTimer = 0;
+    }
+  } else {
+    homeOverflowTimer = 0;
   }
 }
 
@@ -730,8 +763,8 @@ startLoop({
     // Shake lid (glass panels sliding shut/open)
     drawShakeLid(ctx, getLidProgress());
 
-    // Trajectory line (behind gems, only while aiming)
-    if (input.aim.active && !state.gameOver) {
+    // Trajectory line (behind gems, only while aiming — and never on home)
+    if (input.aim.active && !state.gameOver && !isHomeOpen()) {
       const vel = getLaunchVelocity(launcher, input.aim.x, input.aim.y);
       if (vel) {
         const nextDef = state.nextGem.def;
