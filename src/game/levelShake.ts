@@ -6,6 +6,7 @@
 // PC: automatic random shaking applied to the physics world.
 
 import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT, IS_PORTRAIT } from '../canvas';
+import { initShake, requestShakePermission, getShakeInfo, resetShakePeak } from './shakeDetector';
 
 // ---------------------------------------------------------------------------
 // Level thresholds — each level costs 1.4x more than the last
@@ -67,10 +68,6 @@ const IS_MOBILE = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 // Device motion listener (mobile shake detection)
 // ---------------------------------------------------------------------------
 
-let motionMagnitude = 0;
-let motionListenerAttached = false;
-let motionEventsReceived = 0; // debug counter — nonzero proves listener is firing
-let motionPeak = 0; // highest magnitude seen — for HUD readout
 /** User preference: use auto-shake on mobile instead of device motion. */
 let autoShakeMobile = (() => {
   try { return localStorage.getItem('gemjam_autoshake') === '1'; } catch { return false; }
@@ -82,69 +79,30 @@ export function setAutoShakeMobile(v: boolean): void {
   try { localStorage.setItem('gemjam_autoshake', v ? '1' : '0'); } catch { /* */ }
   // When user turns auto-shake OFF, they want device motion — make sure permission
   // is granted. This runs from a tap handler (user gesture), which iOS requires.
-  if (!v) ensureMotionPermission();
+  if (!v) requestShakePermission();
 }
 
-/** Debug readout: motion status for HUD. */
-export function getMotionDebug(): { attached: boolean; events: number; peak: number; current: number } {
-  return { attached: motionListenerAttached, events: motionEventsReceived, peak: motionPeak, current: motionMagnitude };
-}
-
-function handleMotion(e: DeviceMotionEvent): void {
-  motionEventsReceived++;
-  const a = e.accelerationIncludingGravity;
-  if (!a) return;
-  const mag = Math.sqrt((a.x ?? 0) ** 2 + (a.y ?? 0) ** 2 + (a.z ?? 0) ** 2);
-  // Subtract baseline gravity (~9.8), low threshold so gentle shakes register
-  motionMagnitude = Math.max(0, mag - 9);
-  if (motionMagnitude > motionPeak) motionPeak = motionMagnitude;
-}
-
-function attachMotionListener(): void {
-  if (motionListenerAttached) return;
-  window.addEventListener('devicemotion', handleMotion);
-  motionListenerAttached = true;
+/** Debug readout for HUD. Re-exports shake detector info. */
+export function getMotionDebug(): { attached: boolean; events: number; peak: number; current: number; status: string; raw: number } {
+  const s = getShakeInfo();
+  return {
+    attached: s.status === 'listening',
+    events: s.eventCount,
+    peak: s.peakDelta,
+    current: s.currentDelta,
+    status: s.status,
+    raw: s.rawMagnitude,
+  };
 }
 
 /** Start listening for device motion (call once at init). */
 export function initShakeDetection(): void {
-  if (!IS_MOBILE || typeof DeviceMotionEvent === 'undefined') return;
-
-  // iOS 13+ requires explicit permission from a user gesture — defer that.
-  const DME = DeviceMotionEvent as any;
-  if (typeof DME.requestPermission === 'function') return;
-
-  // Android/others: attach immediately. Note: devicemotion events may not fire
-  // outside a secure context (HTTPS or localhost) on recent browsers.
-  attachMotionListener();
+  initShake();
 }
 
-/**
- * Request iOS motion permission. MUST be called synchronously from a user
- * gesture handler (tap/click). Calling from a timer or async chain will fail.
- */
-export async function ensureMotionPermission(): Promise<boolean> {
-  if (!IS_MOBILE || typeof DeviceMotionEvent === 'undefined') return false;
-  if (motionListenerAttached) return true;
-
-  const DME = DeviceMotionEvent as any;
-  if (typeof DME.requestPermission !== 'function') {
-    // Non-iOS: just attach
-    attachMotionListener();
-    return true;
-  }
-  try {
-    const result = await DME.requestPermission();
-    if (result === 'granted') {
-      attachMotionListener();
-      return true;
-    }
-  } catch { /* denied, or not called from user gesture */ }
-  return false;
-}
-
-/** Legacy alias kept for callers. Prefer `ensureMotionPermission`. */
-export const requestMotionPermission = ensureMotionPermission;
+/** Request iOS motion permission (must be called from a user gesture). */
+export const ensureMotionPermission = requestShakePermission;
+export const requestMotionPermission = requestShakePermission;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -207,13 +165,14 @@ export function getShakeGravity(): { gx: number; gy: number } | null {
   }
 
   // Mobile with auto-shake OFF: only device motion drives gravity
-  if (motionMagnitude > 0.3) {
-    ls.shakeScore += motionMagnitude;
-    const strength = Math.min(motionMagnitude * 10, 100);
+  const info = getShakeInfo();
+  if (info.shakeLevel > 0.05) {
+    ls.shakeScore += info.shakeLevel;
+    const strength = info.shakeLevel * 120; // 0..120 m/s²
     const angle = Math.random() * Math.PI * 2;
     return {
-      gx: Math.cos(angle) * strength + (Math.random() - 0.5) * 10,
-      gy: Math.sin(angle) * strength + (Math.random() - 0.5) * 10,
+      gx: Math.cos(angle) * strength + (Math.random() - 0.5) * 15,
+      gy: Math.sin(angle) * strength + (Math.random() - 0.5) * 15,
     };
   }
 
@@ -242,6 +201,7 @@ export function updateLevelShake(dt: number): boolean {
       if (ls.phaseTimer >= 3) {
         ls.phase = 'shaking';
         ls.phaseTimer = 0;
+        resetShakePeak(); // fresh peak readout per shake phase
       }
       return true;
 
@@ -283,7 +243,6 @@ export function resetLevelShake(): void {
   ls.phaseTimer = 0;
   ls.countdownNum = 3;
   ls.shakeScore = 0;
-  motionMagnitude = 0;
 }
 
 /** Set the current level (used when restoring from save). */
@@ -302,6 +261,46 @@ export function closeShopPhase(): void {
 // ---------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------
+
+/**
+ * Small persistent motion sensor indicator — always visible on mobile when
+ * auto-shake is OFF. Lets the player verify their accelerometer is alive
+ * *before* a shake phase begins.
+ */
+export function drawMotionIndicator(ctx: CanvasRenderingContext2D): void {
+  if (!IS_MOBILE || autoShakeMobile) return;
+  const d = getMotionDebug();
+
+  const x = 8;
+  const y = VIRTUAL_HEIGHT - 22;
+  ctx.save();
+  ctx.font = `bold 10px monospace`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+
+  let label: string;
+  let color: string;
+  if (d.status === 'unsupported') { label = 'motion: n/a'; color = '#888'; }
+  else if (d.status === 'awaiting-permission') { label = 'motion: open menu → Enable Motion'; color = '#e8c44a'; }
+  else if (d.status === 'gesture-required') { label = 'motion: open menu → Enable Motion'; color = '#e8c44a'; }
+  else if (d.status === 'permission-denied') { label = 'motion: denied — clear Safari data'; color = '#ff6b6b'; }
+  else if (d.status === 'insecure-context' && d.events === 0) { label = 'motion: needs HTTPS'; color = '#ff6b6b'; }
+  else if (d.events === 0) { label = 'motion: no events (needs HTTPS?)'; color = '#ff6b6b'; }
+  else { label = `motion ✓ ${d.events}evt peak ${d.peak.toFixed(1)}`; color = '#6bff9a'; }
+
+  // Background pill
+  const w = ctx.measureText(label).width + 10;
+  ctx.globalAlpha = 0.75;
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.roundRect(x, y - 8, w, 16, 4);
+  ctx.fill();
+
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = color;
+  ctx.fillText(label, x + 5, y);
+  ctx.restore();
+}
 
 export function drawLevelOverlay(ctx: CanvasRenderingContext2D, _time?: number): void {
   if (ls.phase === 'playing' || ls.phase === 'settling' || ls.phase === 'shop') return;
@@ -473,12 +472,18 @@ export function drawLevelOverlay(ctx: CanvasRenderingContext2D, _time?: number):
       // --- Motion debug readout (mobile + auto-shake OFF only) ---
       if (IS_MOBILE && !autoShakeMobile) {
         const d = getMotionDebug();
-        ctx.globalAlpha = 0.9;
+        ctx.globalAlpha = 0.95;
         ctx.font = `bold 11px monospace`;
-        ctx.fillStyle = d.attached ? '#6bff9a' : '#ff6b6b';
-        const status = d.attached
-          ? `MOTION: ${d.current.toFixed(1)}  peak ${d.peak.toFixed(1)}  (${d.events} evt)`
-          : `MOTION SENSOR BLOCKED — enable in browser settings / use HTTPS`;
+        const good = d.attached && d.events > 0;
+        ctx.fillStyle = good ? '#6bff9a' : '#ff6b6b';
+        let status: string;
+        if (d.status === 'unsupported') status = 'MOTION: device does not support accelerometer';
+        else if (d.status === 'awaiting-permission') status = 'MOTION: tap screen to enable';
+        else if (d.status === 'permission-denied') status = 'MOTION: permission denied — check Safari settings';
+        else if (d.status === 'insecure-context') status = 'MOTION BLOCKED: HTTPS required (use tunnel)';
+        else if (!d.attached) status = 'MOTION: not attached';
+        else if (d.events === 0) status = `MOTION: listener attached but no events (check HTTPS)`;
+        else status = `MOTION ✓ delta ${d.current.toFixed(1)}  peak ${d.peak.toFixed(1)}  ${d.events}evt`;
         ctx.fillText(status, cx, barY + barH + 18);
       }
 

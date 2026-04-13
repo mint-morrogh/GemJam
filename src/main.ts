@@ -22,8 +22,8 @@ import { startProfiling, recordFrame, drawPerfOverlay } from './game/perfProfile
 import { autoDetectQuality, feedFrameTime, updateTransition, shouldRenderEffects } from './game/renderConfig';
 import { getBoardCache } from './game/boardCache';
 import { writeSave, readSave, clearSave } from './game/persistence';
-import { initShakeDetection, ensureMotionPermission, checkLevelUp, updateLevelShake, getShakeGravity, getShakePhase, getCurrentLevel, pointsToNextLevel, getLidProgress, resetLevelShake, setLevel, closeShopPhase, drawLevelOverlay } from './game/levelShake';
-import { isDropdownOpen, toggleDropdown, closeDropdown, updateDropdown, isClickInNav, isClickOnRestart, isClickOnBackdrop, handleAutoShakeToggle, handleFireModeToggle, drawDropdown } from './game/dropdown';
+import { initShakeDetection, ensureMotionPermission, checkLevelUp, updateLevelShake, getShakeGravity, getShakePhase, getCurrentLevel, pointsToNextLevel, getLidProgress, resetLevelShake, setLevel, closeShopPhase, drawLevelOverlay, drawMotionIndicator } from './game/levelShake';
+import { isDropdownOpen, toggleDropdown, closeDropdown, updateDropdown, isClickInNav, isClickOnRestart, isClickOnBackdrop, handleAutoShakeToggle, handleFireModeToggle, handleEnableMotionClick, drawDropdown } from './game/dropdown';
 import { getGold, addGold, goldForTier, spawnGoldText, spawnScoreText, spawnFloatingLabel, updateFloatingText, drawFloatingText, openShop, closeShop, clearShopForNextLevel, isShopOpen, buyItem, rerollShop, getShopClickIndex, isClickOnContinue, isClickOnReroll, drawShop, resetShop, getShopSaveData, restoreShopData } from './game/shop';
 import { setOnBlackhole, resetBlackholeTracker, updateBlackholes, drawActiveBlackholes } from './game/blackhole';
 import type { SaveData, GemSnapshot } from './game/persistence';
@@ -355,6 +355,7 @@ function handleMenuClick(clientX: number, clientY: number): void {
     // Auto-shake toggle
     if (handleAutoShakeToggle(vp.x, vp.y)) return;
     if (handleFireModeToggle(vp.x, vp.y)) return;
+    if (handleEnableMotionClick(vp.x, vp.y)) return;
     // Restart button
     if (isClickOnRestart(vp.x, vp.y)) {
       closeDropdown();
@@ -601,6 +602,9 @@ startLoop({
 
     // Level interlude overlay (banner, countdown, shake)
     drawLevelOverlay(ctx, elapsedTime);
+
+    // Persistent motion sensor diagnostic (mobile, auto-shake OFF)
+    drawMotionIndicator(ctx);
 
     // Shop overlay
     drawShop(ctx);
