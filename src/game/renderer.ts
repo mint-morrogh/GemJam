@@ -819,8 +819,8 @@ export function drawGameOverSummary(
   }
 
   // -- Glass panel behind content ---------------------------------------------
-  const panelW = IS_PORTRAIT ? 400 : 360;
-  const panelH = IS_PORTRAIT ? 540 : 470;
+  const panelW = IS_PORTRAIT ? 400 : 380;
+  const panelH = IS_PORTRAIT ? 640 : 580;
   const panelX = cx - panelW / 2;
   const panelY = cy - panelH / 2;
   const panelR = 20;
@@ -864,16 +864,12 @@ export function drawGameOverSummary(
   ctx.textBaseline = 'middle';
 
   // -- Layout: all Y positions relative to panelY for clean spacing -----------
-  const titleY = panelY + 55;
-  const divider1Y = panelY + 90;
-  const scoreLabelY = panelY + 112;
-  const scoreValueY = panelY + 145;
-  const statsStartY = panelY + 185;
-  const statsGap = IS_PORTRAIT ? 24 : 22;
-  const divider2Y = panelY + 270;
-  const hsY = divider2Y + 18;
-  const lbStartY = panelY + 330;
-  const btnY = panelY + panelH - BTN_H - 12;
+  const titleY = panelY + 50;
+  const divider1Y = panelY + 82;
+  const scoreLabelY = panelY + 102;
+  const scoreValueY = panelY + 132;
+  const statsStartY = panelY + 168;
+  const statsGap = 16;
 
   // -- Element 0: "GAME OVER" ------------------------------------------------
   const a0 = elAlpha(0);
@@ -920,36 +916,62 @@ export function drawGameOverSummary(
 
   // -- Element 2: Run stats ---------------------------------------------------
   const a2 = elAlpha(2);
+  const tierName = GEM_TIERS[stats.peakTier]?.type ?? '—';
+  const capName = tierName.charAt(0).toUpperCase() + tierName.slice(1);
+  const tierColor = GEM_TIERS[stats.peakTier]?.color ?? '#ffffff';
+
+  function fmtTime(s: number): string {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  }
+
+  // Always-shown core stats
+  const coreRows: { label: string; value: string; color: string }[] = [
+    { label: 'Level Reached', value: String(stats.levelsReached), color: '#7dd3fc' },
+    { label: 'Time Survived', value: fmtTime(stats.timeSurvived), color: '#ffffff' },
+    { label: 'Merges', value: String(stats.mergeCount), color: '#ffffff' },
+    { label: 'Best Gem', value: capName, color: tierColor },
+    { label: 'Max Combo', value: `${stats.maxCombo}x`, color: stats.maxCombo >= 5 ? '#FF6B6B' : stats.maxCombo >= 3 ? '#e8c44a' : '#ffffff' },
+    { label: 'Gold Earned', value: stats.goldEarned.toLocaleString(), color: '#FBBF24' },
+  ];
+  // Conditional special-event stats (only if procced this run)
+  const eventRows: { label: string; value: string; color: string }[] = [];
+  if (stats.tierSkipsProcced > 0) eventRows.push({ label: 'Tier Skips', value: String(stats.tierSkipsProcced), color: '#67E8F9' });
+  if (stats.explosionsTriggered > 0) eventRows.push({ label: 'Explosions', value: String(stats.explosionsTriggered), color: '#FF6B2D' });
+  if (stats.blackholesTriggered > 0) eventRows.push({ label: 'Black Holes', value: String(stats.blackholesTriggered), color: '#C084FC' });
+  if (stats.bonusGemsSpawned > 0) eventRows.push({ label: 'Bonus Gems', value: String(stats.bonusGemsSpawned), color: '#4ADE80' });
+  if (stats.bonusMerges > 0) eventRows.push({ label: '5x Score Merges', value: String(stats.bonusMerges), color: '#FBBF24' });
+
+  const statRows = [...coreRows, ...eventRows];
+
   if (a2 > 0) {
     ctx.globalAlpha = a2;
-    const tierName = GEM_TIERS[stats.peakTier]?.type ?? '—';
-    const capName = tierName.charAt(0).toUpperCase() + tierName.slice(1);
-    const tierColor = GEM_TIERS[stats.peakTier]?.color ?? '#ffffff';
-
-    const labelLeft = panelX + 40;
-    const valueRight = panelX + panelW - 40;
-
-    const statRows = [
-      { label: 'Merges', value: String(stats.mergeCount), color: '#ffffff' },
-      { label: 'Best Gem', value: capName, color: tierColor },
-      { label: 'Max Combo', value: `${stats.maxCombo}x`, color: stats.maxCombo >= 5 ? '#FF6B6B' : stats.maxCombo >= 3 ? '#e8c44a' : '#ffffff' },
-    ];
+    const labelLeft = panelX + 32;
+    const valueRight = panelX + panelW - 32;
 
     for (let i = 0; i < statRows.length; i++) {
       const row = statRows[i];
       const ry = statsStartY + i * statsGap;
 
-      ctx.font = `12px monospace`;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.font = `11px monospace`;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
       ctx.textAlign = 'left';
       ctx.fillText(row.label, labelLeft, ry);
 
-      ctx.font = `bold 13px monospace`;
+      ctx.font = `bold 12px monospace`;
       ctx.fillStyle = row.color;
       ctx.textAlign = 'right';
       ctx.fillText(row.value, valueRight, ry);
     }
   }
+
+  // Compute downstream Y positions based on actual row count
+  const statsBottomY = statsStartY + statRows.length * statsGap;
+  const divider2Y = statsBottomY + 12;
+  const hsY = divider2Y + 18;
+  const lbStartY = hsY + 38;
+  const btnY = panelY + panelH - BTN_H - 12;
 
   // -- Element 3: High score --------------------------------------------------
   const a3 = elAlpha(3);

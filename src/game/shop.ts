@@ -10,8 +10,14 @@ import { setGarnetChance, getGarnetChance, setHeavyChance, getHeavyChance, setBo
 // ---------------------------------------------------------------------------
 
 let gold = 0;
+let goldEarnedThisRun = 0;
 export function getGold(): number { return gold; }
-export function addGold(amount: number): void { gold += Math.round(amount * goldMultiplier); }
+export function getGoldEarnedThisRun(): number { return goldEarnedThisRun; }
+export function addGold(amount: number): void {
+  const a = Math.round(amount * goldMultiplier);
+  gold += a;
+  goldEarnedThisRun += a;
+}
 export function setGoldAmount(v: number): void { gold = v; }
 
 /** Gold earned per merge by result tier. */
@@ -279,18 +285,34 @@ export interface ShopItem {
   pct: number;
   cost: number;
   bought: boolean;
+  locked: boolean;
+  /** Seconds remaining of the unlock animation when this item arrives from the previous shop. 0 = none. */
+  unlockAnim: number;
 }
 
 let shopItems: ShopItem[] = [];
 let shopOpen = false;
 let rerollCount = 0;
+/** Items locked in the previous shop visit, waiting to appear in the next one. */
+let pendingLockedItems: ShopItem[] = [];
+
+const UNLOCK_ANIM_DURATION = 0.6; // seconds for the lock-disappearing animation
 
 export function isShopOpen(): boolean { return shopOpen; }
 export function getRerollCost(): number { return 100 * Math.pow(2, rerollCount); }
 
 function rollShopItems(): void {
   shopItems = [];
-  for (let i = 0; i < 6; i++) {
+  // Carried-over locked items take priority — they get the leftmost slots
+  // and play an unlock animation when the shop opens.
+  for (const carried of pendingLockedItems) {
+    carried.locked = false;
+    carried.unlockAnim = UNLOCK_ANIM_DURATION;
+    shopItems.push(carried);
+  }
+  pendingLockedItems = [];
+  // Fill the remaining slots with fresh rolls
+  while (shopItems.length < 6) {
     const def = ITEM_DEFS[Math.floor(Math.random() * ITEM_DEFS.length)];
     const rarity = rollRarity();
     const mult = RARITY_MULT[rarity];
@@ -301,6 +323,8 @@ function rollShopItems(): void {
       pct: def.basePct * mult,
       cost: Math.round(def.baseCost * costMult),
       bought: false,
+      locked: false,
+      unlockAnim: 0,
     });
   }
 }
@@ -311,13 +335,39 @@ export function openShop(): void {
   if (shopItems.length === 0) rollShopItems();
 }
 
-/** Reroll all unbought items for increasing gold cost. Returns true if successful. */
+/** Advance unlock animations. Call each frame while the shop is open. */
+export function updateShop(dt: number): void {
+  if (!shopOpen) return;
+  for (const item of shopItems) {
+    if (item.unlockAnim > 0) {
+      item.unlockAnim = Math.max(0, item.unlockAnim - dt);
+    }
+  }
+}
+
+/** Reroll only the unbought, unlocked items. Locked items keep their slots. */
 export function rerollShop(): boolean {
   const cost = getRerollCost();
   if (gold < cost) return false;
   gold -= cost;
   rerollCount++;
-  rollShopItems();
+  for (let i = 0; i < shopItems.length; i++) {
+    const cur = shopItems[i];
+    if (cur.locked || cur.bought) continue; // preserve locked + already-bought slots
+    const def = ITEM_DEFS[Math.floor(Math.random() * ITEM_DEFS.length)];
+    const rarity = rollRarity();
+    const mult = RARITY_MULT[rarity];
+    const costMult = RARITY_COST_MULT[rarity];
+    shopItems[i] = {
+      def,
+      rarity,
+      pct: def.basePct * mult,
+      cost: Math.round(def.baseCost * costMult),
+      bought: false,
+      locked: false,
+      unlockAnim: 0,
+    };
+  }
   return true;
 }
 
@@ -327,7 +377,7 @@ export function closeShop(): void {
 
 export function buyItem(index: number): boolean {
   const item = shopItems[index];
-  if (!item || item.bought || gold < item.cost) return false;
+  if (!item || item.bought || item.locked || gold < item.cost) return false;
   gold -= item.cost;
   item.bought = true;
   item.def.apply(item.pct);
@@ -335,6 +385,9 @@ export function buyItem(index: number): boolean {
 }
 
 export function clearShopForNextLevel(): void {
+  // Carry locked, unbought items into the next shop visit. They'll appear
+  // with an unlock animation when the next shop opens.
+  pendingLockedItems = shopItems.filter(it => it.locked && !it.bought);
   shopItems = [];
   shopOpen = false;
   rerollCount = 0;
@@ -342,7 +395,9 @@ export function clearShopForNextLevel(): void {
 
 export function resetShop(): void {
   gold = 0;
+  goldEarnedThisRun = 0;
   shopItems = [];
+  pendingLockedItems = [];
   shopOpen = false;
   rerollCount = 0;
   setGarnetChance(0);
@@ -398,6 +453,14 @@ export function getShopSaveData(): Record<string, any> {
       pct: it.pct,
       cost: it.cost,
       bought: it.bought,
+      locked: it.locked,
+    })),
+    // Persist locked items waiting to appear in the next shop visit
+    pendingLockedSave: pendingLockedItems.map(it => ({
+      defId: it.def.id,
+      rarity: it.rarity,
+      pct: it.pct,
+      cost: it.cost,
     })),
   };
 }
@@ -420,7 +483,21 @@ export function restoreShopData(data: Record<string, any>): void {
     shopItems = [];
     for (const s of data.shopItemsSave) {
       const def = ITEM_DEFS.find(d => d.id === s.defId);
-      if (def) shopItems.push({ def, rarity: s.rarity, pct: s.pct, cost: s.cost, bought: s.bought });
+      if (def) shopItems.push({
+        def, rarity: s.rarity, pct: s.pct, cost: s.cost, bought: s.bought,
+        locked: !!s.locked, unlockAnim: 0,
+      });
+    }
+  }
+  // Restore pending locked items (carried over from a prior shop close)
+  if (Array.isArray(data.pendingLockedSave)) {
+    pendingLockedItems = [];
+    for (const s of data.pendingLockedSave) {
+      const def = ITEM_DEFS.find(d => d.id === s.defId);
+      if (def) pendingLockedItems.push({
+        def, rarity: s.rarity, pct: s.pct, cost: s.cost, bought: false,
+        locked: true, unlockAnim: 0,
+      });
     }
   }
 }
@@ -454,21 +531,87 @@ const CARD_GAP = IS_PORTRAIT ? 12 : 10;
 const COLS = IS_PORTRAIT ? 2 : 3;
 const ROWS = IS_PORTRAIT ? 3 : 2;
 
-export function getShopClickIndex(vx: number, vy: number): number {
-  if (!shopOpen) return -1;
+const LOCK_BTN_SIZE = 22;
+
+/** Draw a small padlock icon centered on (cx, cy). */
+function drawLockIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, color: string, locked: boolean): void {
+  const w = size;
+  const h = size * 1.2;
+  const bodyH = h * 0.6;
+  const bodyW = w * 0.85;
+  const shackleR = bodyW * 0.4;
+  const shackleY = cy - h / 2 + shackleR;
+
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1.2, size / 9);
+  ctx.lineCap = 'round';
+
+  // Shackle (arc) — open if unlocked
+  ctx.beginPath();
+  if (locked) {
+    ctx.arc(cx, shackleY, shackleR, Math.PI, Math.PI * 2);
+  } else {
+    ctx.arc(cx + shackleR * 0.4, shackleY, shackleR, Math.PI * 1.1, Math.PI * 2.05);
+  }
+  ctx.stroke();
+
+  // Body (rounded rect)
+  const bodyY = cy + h / 2 - bodyH;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.roundRect(cx - bodyW / 2, bodyY, bodyW, bodyH, Math.max(1, size / 8));
+  ctx.fill();
+  ctx.restore();
+}
+
+function shopGridOrigin(): { startX: number; startY: number } {
   const gridW = COLS * CARD_W + (COLS - 1) * CARD_GAP;
   const gridH = ROWS * CARD_H + (ROWS - 1) * CARD_GAP;
-  const startX = (VIRTUAL_WIDTH - gridW) / 2;
-  const startY = (VIRTUAL_HEIGHT - gridH) / 2 + 30;
+  return {
+    startX: (VIRTUAL_WIDTH - gridW) / 2,
+    startY: (VIRTUAL_HEIGHT - gridH) / 2 + 30,
+  };
+}
 
+function cardOrigin(i: number): { cx: number; cy: number } {
+  const { startX, startY } = shopGridOrigin();
+  const col = i % COLS;
+  const row = Math.floor(i / COLS);
+  return { cx: startX + col * (CARD_W + CARD_GAP), cy: startY + row * (CARD_H + CARD_GAP) };
+}
+
+function lockBtnRect(i: number): { x: number; y: number; w: number; h: number } {
+  const { cx, cy } = cardOrigin(i);
+  return { x: cx + CARD_W - LOCK_BTN_SIZE - 4, y: cy + 4, w: LOCK_BTN_SIZE, h: LOCK_BTN_SIZE };
+}
+
+export function getShopClickIndex(vx: number, vy: number): number {
+  if (!shopOpen) return -1;
   for (let i = 0; i < shopItems.length; i++) {
-    const col = i % COLS;
-    const row = Math.floor(i / COLS);
-    const cx = startX + col * (CARD_W + CARD_GAP);
-    const cy = startY + row * (CARD_H + CARD_GAP);
+    const { cx, cy } = cardOrigin(i);
     if (vx >= cx && vx <= cx + CARD_W && vy >= cy && vy <= cy + CARD_H) return i;
   }
   return -1;
+}
+
+/**
+ * Toggle lock on the clicked shop item. Returns true if a lock button was hit.
+ * Bought items can't be locked; mid-unlock-animation items can't be locked.
+ */
+export function handleShopLockClick(vx: number, vy: number): boolean {
+  if (!shopOpen) return false;
+  for (let i = 0; i < shopItems.length; i++) {
+    const r = lockBtnRect(i);
+    if (vx >= r.x && vx <= r.x + r.w && vy >= r.y && vy <= r.y + r.h) {
+      const item = shopItems[i];
+      if (item.bought) return true; // swallow click but do nothing
+      if (item.unlockAnim > 0) return true; // can't relock during animation
+      item.locked = !item.locked;
+      return true;
+    }
+  }
+  return false;
 }
 
 /** Check if click is on the "Continue" button. */
@@ -539,16 +682,18 @@ export function drawShop(ctx: CanvasRenderingContext2D): void {
 
     ctx.save();
 
-    // Card background
+    // Card background — locked items get a darker, slightly desaturated tint
     ctx.beginPath();
     ctx.roundRect(cx, cy, CARD_W, CARD_H, 10);
-    ctx.fillStyle = item.bought ? 'rgba(30, 40, 30, 0.8)' : 'rgba(12, 16, 24, 0.9)';
+    if (item.bought) ctx.fillStyle = 'rgba(30, 40, 30, 0.8)';
+    else if (item.locked) ctx.fillStyle = 'rgba(20, 22, 32, 0.92)';
+    else ctx.fillStyle = 'rgba(12, 16, 24, 0.9)';
     ctx.fill();
 
     // Rarity border
     ctx.strokeStyle = item.bought ? 'rgba(100, 100, 100, 0.3)' : rc;
     ctx.lineWidth = item.bought ? 1 : 1.5;
-    ctx.globalAlpha = item.bought ? 0.4 : 0.6;
+    ctx.globalAlpha = item.bought ? 0.4 : (item.locked ? 0.35 : 0.6);
     ctx.stroke();
     ctx.globalAlpha = 1;
 
@@ -558,7 +703,11 @@ export function drawShop(ctx: CanvasRenderingContext2D): void {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
       ctx.fillText('SOLD', cx + CARD_W / 2, cy + CARD_H / 2);
     } else {
+      // Locked items render their content dimmed
+      const contentAlpha = item.locked ? 0.35 : 1;
+
       // Rarity label
+      ctx.globalAlpha = contentAlpha;
       ctx.font = `bold 9px monospace`;
       ctx.fillStyle = rc;
       ctx.fillText(RARITY_LABELS[item.rarity].toUpperCase(), cx + CARD_W / 2, cy + 14);
@@ -576,8 +725,36 @@ export function drawShop(ctx: CanvasRenderingContext2D): void {
       // Cost
       const canAfford = gold >= item.cost;
       ctx.font = `bold 13px monospace`;
-      ctx.fillStyle = canAfford ? '#FBBF24' : '#f87171';
+      ctx.fillStyle = item.locked ? 'rgba(120, 120, 120, 0.8)'
+        : (canAfford ? '#FBBF24' : '#f87171');
       ctx.fillText(`${item.cost} gold`, cx + CARD_W / 2, cy + CARD_H - 18);
+      ctx.globalAlpha = 1;
+    }
+
+    // -- Lock toggle button (top-right corner) --
+    if (!item.bought) {
+      const lr = lockBtnRect(i);
+      ctx.beginPath();
+      ctx.roundRect(lr.x, lr.y, lr.w, lr.h, 5);
+      ctx.fillStyle = item.locked ? 'rgba(232, 196, 74, 0.18)' : 'rgba(255, 255, 255, 0.06)';
+      ctx.fill();
+      ctx.strokeStyle = item.locked ? 'rgba(232, 196, 74, 0.6)' : 'rgba(255, 255, 255, 0.15)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      drawLockIcon(ctx, lr.x + lr.w / 2, lr.y + lr.h / 2, 9, item.locked ? '#FBBF24' : 'rgba(255, 255, 255, 0.5)', item.locked);
+    }
+
+    // -- Unlock animation: big lock icon scaling out + fading --
+    if (item.unlockAnim > 0) {
+      const t = item.unlockAnim / UNLOCK_ANIM_DURATION; // 1 → 0
+      const alpha = t;
+      const scale = 1 + (1 - t) * 1.5; // grow from 1× to 2.5×
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      const centerX = cx + CARD_W / 2;
+      const centerY = cy + CARD_H / 2;
+      drawLockIcon(ctx, centerX, centerY, 28 * scale, '#FBBF24', true);
+      ctx.restore();
     }
 
     ctx.restore();

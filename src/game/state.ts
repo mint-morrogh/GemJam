@@ -20,6 +20,14 @@ export interface RunStats {
   mergeCount: number;
   peakTier: number;
   maxCombo: number;
+  levelsReached: number;
+  goldEarned: number;
+  timeSurvived: number; // seconds
+  tierSkipsProcced: number;
+  explosionsTriggered: number;
+  blackholesTriggered: number;
+  bonusGemsSpawned: number;
+  bonusMerges: number;
 }
 
 export const GEM_QUEUE_DEPTH = 7;
@@ -32,6 +40,11 @@ export interface GameState {
   mergeCount: number;
   peakTier: number;
   maxCombo: number;
+  tierSkipsProcced: number;
+  explosionsTriggered: number;
+  blackholesTriggered: number;
+  bonusGemsSpawned: number;
+  bonusMerges: number;
 }
 
 /** Extra spawn chance for tier 4 (garnet), driven by shop upgrades. */
@@ -99,7 +112,12 @@ export function createGameState(): GameState {
   fillQueue(gemQueue);
 
   return Object.defineProperty(
-    { columns, gemQueue, gameOver: false, mergeCount: 0, peakTier: 0, maxCombo: 0 } as GameState,
+    {
+      columns, gemQueue, gameOver: false,
+      mergeCount: 0, peakTier: 0, maxCombo: 0,
+      tierSkipsProcced: 0, explosionsTriggered: 0, blackholesTriggered: 0,
+      bonusGemsSpawned: 0, bonusMerges: 0,
+    } as GameState,
     'nextGem',
     { get(this: GameState) { return this.gemQueue[0]; }, enumerable: true },
   );
@@ -121,6 +139,11 @@ export function resetGameState(state: GameState): void {
   state.mergeCount = 0;
   state.peakTier = 0;
   state.maxCombo = 0;
+  state.tierSkipsProcced = 0;
+  state.explosionsTriggered = 0;
+  state.blackholesTriggered = 0;
+  state.bonusGemsSpawned = 0;
+  state.bonusMerges = 0;
 }
 
 // -- Overflow detection -------------------------------------------------------

@@ -6,6 +6,7 @@ import { VIRTUAL_WIDTH, IS_PORTRAIT } from '../canvas';
 import { getAutoShakeMobile, setAutoShakeMobile } from './levelShake';
 import { getActiveUpgrades } from './shop';
 import { getFireMode, setFireMode } from './input';
+import { getHapticsEnabled, setHapticsEnabled, isHapticsSupported } from './haptics';
 
 const IS_MOBILE = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
@@ -32,9 +33,9 @@ function getPanelH(): number {
     h += 24 + ups.length * UPGRADE_ROW_H + 10; // card content
     h += 20; // gap after card
   }
-  // Toggle buttons (mobile): auto-shake + fire mode
+  // Toggle buttons (mobile): auto-shake + fire mode + haptics
   if (IS_MOBILE) {
-    h += (BTN_H + 10) * 2 + 6;
+    h += (BTN_H + 10) * 3 + 6;
   }
   // Restart button
   h += BTN_H + 20;
@@ -44,6 +45,7 @@ function getPanelH(): number {
 /** These are computed during draw since they depend on content flow. */
 let _toggleY = 0;
 let _fireModeY = 0;
+let _hapticsY = 0;
 let _restartBtnY = 0;
 function getRestartBtnY(): number { return _restartBtnY; }
 function getToggleY(): number { return _toggleY; }
@@ -122,6 +124,24 @@ export function isClickOnFireMode(vx: number, vy: number): boolean {
   if (!IS_MOBILE || ds.progress < 0.9) return false;
   return vx >= BTN_X && vx <= BTN_X + BTN_W &&
     vy >= _fireModeY && vy <= _fireModeY + BTN_H;
+}
+
+/** Check if click hits the haptics toggle. */
+export function isClickOnHaptics(vx: number, vy: number): boolean {
+  if (!IS_MOBILE || ds.progress < 0.9) return false;
+  return vx >= BTN_X && vx <= BTN_X + BTN_W &&
+    vy >= _hapticsY && vy <= _hapticsY + BTN_H;
+}
+
+/** Handle haptics toggle click. Returns true if handled. */
+export function handleHapticsToggle(vx: number, vy: number): boolean {
+  if (!isClickOnHaptics(vx, vy)) return false;
+  setHapticsEnabled(!getHapticsEnabled());
+  // Confirmation pulse so the user feels it work (or notice it didn't)
+  if (getHapticsEnabled() && isHapticsSupported()) {
+    try { navigator.vibrate(20); } catch { /* */ }
+  }
+  return true;
 }
 
 /** Handle fire mode toggle click. Returns true if handled. */
@@ -270,6 +290,31 @@ export function drawDropdown(
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`AUTO-SHAKE: ${isAuto ? 'ON' : 'OFF'}`, VIRTUAL_WIDTH / 2, rowY + BTN_H / 2);
+    rowY += BTN_H + 10;
+
+    // -- Haptics toggle (mobile only) — vibration feedback --
+    _hapticsY = rowY;
+    const isHapticsOn = getHapticsEnabled();
+    const hapticsSupported = isHapticsSupported();
+    ctx.beginPath();
+    ctx.roundRect(BTN_X, rowY, BTN_W, BTN_H, btnR);
+    ctx.fillStyle = isHapticsOn ? 'rgba(232, 144, 80, 0.15)' : 'rgba(100, 120, 150, 0.1)';
+    ctx.fill();
+    ctx.strokeStyle = isHapticsOn ? 'rgba(232, 144, 80, 0.4)' : 'rgba(100, 120, 150, 0.25)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.font = `bold ${IS_PORTRAIT ? 13 : 11}px monospace`;
+    ctx.fillStyle = isHapticsOn ? '#fb923c' : '#6b7280';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const hapticsLabel = hapticsSupported
+      ? `HAPTICS: ${isHapticsOn ? 'ON' : 'OFF'}`
+      : `HAPTICS: ${isHapticsOn ? 'ON' : 'OFF'} (iOS unsupported)`;
+    ctx.font = hapticsSupported
+      ? `bold ${IS_PORTRAIT ? 13 : 11}px monospace`
+      : `bold ${IS_PORTRAIT ? 10 : 9}px monospace`;
+    ctx.fillText(hapticsLabel, VIRTUAL_WIDTH / 2, rowY + BTN_H / 2);
     rowY += BTN_H + 10;
 
     // -- Fire mode toggle (mobile only) — unrelated to shake, separate row --

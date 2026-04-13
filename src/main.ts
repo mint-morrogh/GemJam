@@ -23,8 +23,9 @@ import { autoDetectQuality, feedFrameTime, updateTransition, shouldRenderEffects
 import { getBoardCache } from './game/boardCache';
 import { writeSave, readSave, clearSave } from './game/persistence';
 import { initShakeDetection, ensureMotionPermission, checkLevelUp, updateLevelShake, getShakeGravity, getShakePhase, getCurrentLevel, pointsToNextLevel, getLidProgress, resetLevelShake, setLevel, closeShopPhase, drawLevelOverlay } from './game/levelShake';
-import { isDropdownOpen, toggleDropdown, closeDropdown, updateDropdown, isClickInNav, isClickOnRestart, isClickOnBackdrop, handleAutoShakeToggle, handleFireModeToggle, drawDropdown } from './game/dropdown';
-import { getGold, addGold, goldForTier, spawnGoldText, spawnScoreText, spawnFloatingLabel, updateFloatingText, drawFloatingText, openShop, closeShop, clearShopForNextLevel, isShopOpen, buyItem, rerollShop, getShopClickIndex, isClickOnContinue, isClickOnReroll, drawShop, resetShop, getShopSaveData, restoreShopData } from './game/shop';
+import { initHaptics, hapticMerge, hapticExplosion, hapticTierSkip, hapticBlackhole, hapticPrestige } from './game/haptics';
+import { isDropdownOpen, toggleDropdown, closeDropdown, updateDropdown, isClickInNav, isClickOnRestart, isClickOnBackdrop, handleAutoShakeToggle, handleFireModeToggle, handleHapticsToggle, drawDropdown } from './game/dropdown';
+import { getGold, addGold, goldForTier, spawnGoldText, spawnScoreText, spawnFloatingLabel, updateFloatingText, drawFloatingText, openShop, closeShop, clearShopForNextLevel, isShopOpen, buyItem, rerollShop, getShopClickIndex, isClickOnContinue, isClickOnReroll, drawShop, updateShop, resetShop, getShopSaveData, restoreShopData, getGoldEarnedThisRun, handleShopLockClick } from './game/shop';
 import { setOnBlackhole, resetBlackholeTracker, updateBlackholes, drawActiveBlackholes } from './game/blackhole';
 import type { SaveData, GemSnapshot } from './game/persistence';
 import { drawPauseOverlay } from './game/renderer';
@@ -51,6 +52,7 @@ document.body.appendChild(rotatePrompt);
 // -- Load persisted settings ------------------------------------------------
 loadSettings();
 initShakeDetection();
+initHaptics();
 
 // iOS 13+ requires requestPermission() from a user-activation event. Per HTML
 // spec, on touch devices only `touchend`, `pointerup`, and `click` qualify —
@@ -142,6 +144,16 @@ setOnMerge((resultTier, _rainbow, midX, midY, bonusMerge, tierSkipped, bonusGemS
   state.mergeCount++;
   if (scoreTier > state.peakTier) state.peakTier = scoreTier;
   if (scoring.comboCount > state.maxCombo) state.maxCombo = scoring.comboCount;
+  if (tierSkipped) state.tierSkipsProcced++;
+  if (exploded) state.explosionsTriggered++;
+  if (bonusGemSpawned) state.bonusGemsSpawned++;
+  if (bonusMerge) state.bonusMerges++;
+
+  // Haptic feedback (no-op on iOS Safari, no-op when disabled in settings)
+  if (resultTier === -1) hapticPrestige();
+  else hapticMerge(scoreTier);
+  if (exploded) hapticExplosion();
+  else if (tierSkipped) hapticTierSkip();
 });
 
 // -- Black hole callback ----------------------------------------------------
@@ -151,6 +163,8 @@ setOnBlackhole((tier, absorbed, totalPoints, x, y) => {
   addGold(goldAmt);
   spawnFloatingLabel(x, y - 30, `BLACK HOLE! x${absorbed + 1}`, '#C084FC', 1.5);
   spawnGoldText(x, y - 10, goldAmt);
+  state.blackholesTriggered++;
+  hapticBlackhole();
 });
 
 // -- Game state (preview gem + column-drop logic) ---------------------------
@@ -348,6 +362,8 @@ function handleMenuClick(clientX: number, clientY: number): void {
 
   // Shop clicks take priority
   if (isShopOpen()) {
+    // Lock toggle clicks must run before buy clicks (lock button overlaps card)
+    if (handleShopLockClick(vp.x, vp.y)) return;
     const idx = getShopClickIndex(vp.x, vp.y);
     if (idx >= 0) { buyItem(idx); return; }
     if (isClickOnReroll(vp.x, vp.y)) { rerollShop(); return; }
@@ -358,6 +374,7 @@ function handleMenuClick(clientX: number, clientY: number): void {
   if (isDropdownOpen()) {
     // Auto-shake toggle (also triggers motion permission request on iOS)
     if (handleAutoShakeToggle(vp.x, vp.y)) return;
+    if (handleHapticsToggle(vp.x, vp.y)) return;
     if (handleFireModeToggle(vp.x, vp.y)) return;
     // Restart button
     if (isClickOnRestart(vp.x, vp.y)) {
@@ -422,6 +439,7 @@ startProfiling();
 startLoop({
   update(_dt: number) {
     updateDropdown(_dt);
+    updateShop(_dt);
     if (paused) return;
     elapsedTime += _dt;
     fireCooldown = Math.max(0, fireCooldown - _dt);
@@ -624,6 +642,14 @@ startLoop({
         mergeCount: state.mergeCount,
         peakTier: state.peakTier,
         maxCombo: state.maxCombo,
+        levelsReached: getCurrentLevel(),
+        goldEarned: getGoldEarnedThisRun(),
+        timeSurvived: elapsedTime,
+        tierSkipsProcced: state.tierSkipsProcced,
+        explosionsTriggered: state.explosionsTriggered,
+        blackholesTriggered: state.blackholesTriggered,
+        bonusGemsSpawned: state.bonusGemsSpawned,
+        bonusMerges: state.bonusMerges,
       }, gameOverHistory, gameOverRank);
     }
 
