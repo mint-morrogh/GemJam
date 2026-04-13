@@ -48,8 +48,8 @@ let lastX = 0, lastY = 0, lastZ = 0, hasLast = false;
 // Smoothing for shakeLevel
 let smoothed = 0;
 
-const SHAKE_THRESHOLD = 6; // delta magnitude needed to count as "shaking"
-const SHAKE_MAX = 40;      // delta mag that saturates shakeLevel to 1.0
+const SHAKE_THRESHOLD = 2; // delta magnitude above noise floor
+const SHAKE_MAX = 15;      // delta mag that saturates shakeLevel to 1.0 — small so moderate shakes hit full strength
 
 function handleMotion(e: DeviceMotionEvent): void {
   state.eventCount++;
@@ -73,9 +73,9 @@ function handleMotion(e: DeviceMotionEvent): void {
     state.currentDelta = dx + dy + dz;
     if (state.currentDelta > state.peakDelta) state.peakDelta = state.currentDelta;
 
-    // Smooth shake level for UI / gravity driving
-    const instant = Math.min(1, Math.max(0, (state.currentDelta - SHAKE_THRESHOLD / 2) / SHAKE_MAX));
-    smoothed = smoothed * 0.7 + instant * 0.3;
+    // Smooth shake level for UI / gravity driving — weighted toward responsive new samples
+    const instant = Math.min(1, Math.max(0, (state.currentDelta - SHAKE_THRESHOLD) / SHAKE_MAX));
+    smoothed = smoothed * 0.35 + instant * 0.65;
     state.shakeLevel = smoothed;
   }
 

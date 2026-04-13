@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { VIRTUAL_WIDTH, IS_PORTRAIT } from '../canvas';
-import { getAutoShakeMobile, setAutoShakeMobile, ensureMotionPermission, getMotionDebug } from './levelShake';
+import { getAutoShakeMobile, setAutoShakeMobile, getMotionDebug } from './levelShake';
 import { getActiveUpgrades } from './shop';
 import { getFireMode, setFireMode } from './input';
 
@@ -32,14 +32,25 @@ function getPanelH(): number {
     h += 24 + ups.length * UPGRADE_ROW_H + 10; // card content
     h += 20; // gap after card
   }
-  // Toggle buttons (mobile): auto-shake + fire mode (plus motion status line when auto-shake is off)
+  // Toggle buttons (mobile): auto-shake + fire mode (+ optional motion error line)
   if (IS_MOBILE) {
     h += (BTN_H + 10) * 2 + 6;
-    if (!getAutoShakeMobile()) h += 18; // inline motion status line
+    if (!getAutoShakeMobile() && motionHasError()) h += 18;
   }
   // Restart button
   h += BTN_H + 20;
   return h;
+}
+
+/** True if the motion status is in an error state that warrants an inline notice. */
+function motionHasError(): boolean {
+  const d = getMotionDebug();
+  if (d.status === 'unsupported') return true;
+  if (d.status === 'permission-denied') return true;
+  if (d.status === 'insecure-context' && d.events === 0) return true;
+  if ((d.status === 'awaiting-permission' || d.status === 'gesture-required') && d.events === 0) return true;
+  if (d.status === 'listening' && d.events === 0) return true;
+  return false;
 }
 
 /** These are computed during draw since they depend on content flow. */
@@ -113,10 +124,7 @@ export function isClickOnAutoShake(vx: number, vy: number): boolean {
 /** Handle auto-shake toggle click. Returns true if handled. */
 export function handleAutoShakeToggle(vx: number, vy: number): boolean {
   if (!isClickOnAutoShake(vx, vy)) return false;
-  // Any tap on the shake toggle = user engagement with motion settings.
-  // Request permission eagerly — this runs in user-gesture context (touchend),
-  // which iOS requires. No-op if already granted or unsupported.
-  ensureMotionPermission();
+  // Permission is already requested on first-tap (see main.ts); no need here.
   setAutoShakeMobile(!getAutoShakeMobile());
   return true;
 }
@@ -276,26 +284,26 @@ export function drawDropdown(
     ctx.fillText(`AUTO-SHAKE: ${isAuto ? 'ON' : 'OFF'}`, VIRTUAL_WIDTH / 2, rowY + BTN_H / 2);
     rowY += BTN_H + 4;
 
-    // Motion status line (only when auto-shake is OFF and motion matters)
+    // Motion error line — only shown when something is wrong. Silent when working.
     if (!isAuto) {
       const d = getMotionDebug();
-      let label: string;
-      let color: string;
-      if (d.status === 'unsupported') { label = 'motion sensor unavailable'; color = '#888'; }
-      else if (d.status === 'awaiting-permission' || d.status === 'gesture-required') {
-        label = 'tap AUTO-SHAKE to prompt for motion'; color = '#e8c44a';
+      let label = '';
+      if (d.status === 'unsupported') label = 'motion sensor unavailable on this device';
+      else if (d.status === 'permission-denied') label = 'motion denied — clear Safari website data';
+      else if (d.status === 'insecure-context' && d.events === 0) label = 'motion needs HTTPS';
+      else if ((d.status === 'awaiting-permission' || d.status === 'gesture-required') && d.events === 0) {
+        label = 'tap anywhere once to enable motion';
       }
-      else if (d.status === 'permission-denied') { label = 'motion denied — clear Safari website data'; color = '#f87171'; }
-      else if (d.status === 'insecure-context' && d.events === 0) { label = 'motion needs HTTPS (try GitHub Pages build)'; color = '#f87171'; }
-      else if (d.events === 0) { label = 'motion listener attached but no events'; color = '#f87171'; }
-      else { label = `motion ✓  peak ${d.peak.toFixed(1)}  ${d.events} events`; color = '#4ade80'; }
+      else if (d.events === 0 && d.status === 'listening') label = 'motion listener silent — try reloading';
 
-      ctx.font = `${IS_PORTRAIT ? 10 : 9}px monospace`;
-      ctx.fillStyle = color;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(label, VIRTUAL_WIDTH / 2, rowY + 8);
-      rowY += 18;
+      if (label) {
+        ctx.font = `${IS_PORTRAIT ? 10 : 9}px monospace`;
+        ctx.fillStyle = '#f87171';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, VIRTUAL_WIDTH / 2, rowY + 8);
+        rowY += 18;
+      }
     }
 
     rowY += 10;

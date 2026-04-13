@@ -164,15 +164,18 @@ export function getShakeGravity(): { gx: number; gy: number } | null {
     };
   }
 
-  // Mobile with auto-shake OFF: only device motion drives gravity
+  // Mobile with auto-shake OFF: device motion drives gravity — MUCH stronger
+  // than auto mode because the player is doing physical work.
   const info = getShakeInfo();
-  if (info.shakeLevel > 0.05) {
+  if (info.shakeLevel > 0.02) {
     ls.shakeScore += info.shakeLevel;
-    const strength = info.shakeLevel * 120; // 0..120 m/s²
+    // 80 m/s² minimum (just slightly below auto-mode minimum) up to 480 m/s²
+    // at full shake — ~4× auto-mode max so it feels impactful.
+    const strength = 80 + info.shakeLevel * 400;
     const angle = Math.random() * Math.PI * 2;
     return {
-      gx: Math.cos(angle) * strength + (Math.random() - 0.5) * 15,
-      gy: Math.sin(angle) * strength + (Math.random() - 0.5) * 15,
+      gx: Math.cos(angle) * strength + (Math.random() - 0.5) * 40,
+      gy: Math.sin(angle) * strength + (Math.random() - 0.5) * 40,
     };
   }
 
