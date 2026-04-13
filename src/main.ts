@@ -52,15 +52,19 @@ document.body.appendChild(rotatePrompt);
 loadSettings();
 initShakeDetection();
 
-// iOS 13+ requires requestPermission() from a user gesture. Request on the
-// first tap/click anywhere — guaranteed user-gesture context.
+// iOS 13+ requires requestPermission() from a user-activation event. Per HTML
+// spec, on touch devices only `touchend`, `pointerup`, and `click` qualify —
+// NOT `touchstart`/`pointerdown`. So we listen on the right ones, capture
+// phase, so we run before any downstream `stopPropagation`.
 const firstTapMotionHook = () => {
   ensureMotionPermission();
-  window.removeEventListener('pointerdown', firstTapMotionHook);
-  window.removeEventListener('touchstart', firstTapMotionHook);
+  window.removeEventListener('touchend', firstTapMotionHook, true);
+  window.removeEventListener('pointerup', firstTapMotionHook, true);
+  window.removeEventListener('click', firstTapMotionHook, true);
 };
-window.addEventListener('pointerdown', firstTapMotionHook, { once: false });
-window.addEventListener('touchstart', firstTapMotionHook, { once: false });
+window.addEventListener('touchend', firstTapMotionHook, true);
+window.addEventListener('pointerup', firstTapMotionHook, true);
+window.addEventListener('click', firstTapMotionHook, true);
 
 // Warn if not in secure context — devicemotion is blocked on http:// for many
 // modern browsers (iOS Safari especially).
