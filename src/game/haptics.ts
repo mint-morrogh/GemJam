@@ -11,8 +11,8 @@ const STORAGE_KEY = 'gemjam_haptics';
 let hapticsEnabled = (() => {
   try {
     const v = localStorage.getItem(STORAGE_KEY);
-    return v === null ? true : v === '1'; // default ON
-  } catch { return true; }
+    return v === null ? false : v === '1'; // default OFF
+  } catch { return false; }
 })();
 
 export function getHapticsEnabled(): boolean { return hapticsEnabled; }

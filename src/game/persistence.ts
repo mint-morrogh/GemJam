@@ -42,6 +42,13 @@ export interface SaveData {
   gameOver: boolean;
   /** Current level (so we don't re-trigger level-up on restore). */
   level?: number;
+  /** Shake-phase snapshot — so refreshing in the shop doesn't rewind to level-complete. */
+  shakePhase?: string;
+  shakePhaseTimer?: number;
+  shakeCountdownNum?: number;
+  shakeScore?: number;
+  /** Game mode the save belongs to — used for cross-mode collision checks. */
+  mode?: 'classic' | 'suika';
 }
 
 // ---------------------------------------------------------------------------

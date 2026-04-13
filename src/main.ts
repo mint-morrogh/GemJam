@@ -22,8 +22,11 @@ import { startProfiling, recordFrame, drawPerfOverlay } from './game/perfProfile
 import { autoDetectQuality, feedFrameTime, updateTransition, shouldRenderEffects } from './game/renderConfig';
 import { getBoardCache } from './game/boardCache';
 import { writeSave, readSave, clearSave } from './game/persistence';
-import { initShakeDetection, ensureMotionPermission, checkLevelUp, updateLevelShake, getShakeGravity, getShakePhase, getCurrentLevel, pointsToNextLevel, getLidProgress, resetLevelShake, setLevel, closeShopPhase, drawLevelOverlay } from './game/levelShake';
+import { initShakeDetection, ensureMotionPermission, checkLevelUp, updateLevelShake, getShakeGravity, getShakePhase, getCurrentLevel, pointsToNextLevel, getLidProgress, resetLevelShake, setLevel, closeShopPhase, drawLevelOverlay, getShakeStateForSave, restoreShakeState } from './game/levelShake';
+import type { ShakePhase } from './game/levelShake';
 import { initHaptics, hapticMerge, hapticExplosion, hapticTierSkip, hapticBlackhole, hapticPrestige } from './game/haptics';
+import { getGameMode, setGameMode } from './game/gameMode';
+import { isHomeOpen, openHome, closeHome, drawHome, handleHomeClick, updateHome, type HomeAction } from './game/homepage';
 import { isDropdownOpen, toggleDropdown, closeDropdown, updateDropdown, isClickInNav, isClickOnRestart, isClickOnBackdrop, handleAutoShakeToggle, handleFireModeToggle, handleHapticsToggle, drawDropdown } from './game/dropdown';
 import { getGold, addGold, goldForTier, spawnGoldText, spawnScoreText, spawnFloatingLabel, updateFloatingText, drawFloatingText, openShop, closeShop, clearShopForNextLevel, isShopOpen, buyItem, rerollShop, getShopClickIndex, isClickOnContinue, isClickOnReroll, drawShop, updateShop, resetShop, getShopSaveData, restoreShopData, getGoldEarnedThisRun, handleShopLockClick } from './game/shop';
 import { setOnBlackhole, resetBlackholeTracker, updateBlackholes, drawActiveBlackholes } from './game/blackhole';
@@ -99,6 +102,10 @@ const scoring = createScoringState(loadHighScore());
 let elapsedTime = 0;
 
 setOnMerge((resultTier, _rainbow, midX, midY, bonusMerge, tierSkipped, bonusGemSpawned, exploded) => {
+  // Homepage demo: let the physics + visual effects run, but don't touch
+  // scoring/gold/stats. Keeps the background pretty without polluting state.
+  if (isHomeOpen()) return;
+
   registerMerge(scoring, elapsedTime);
 
   const scoreTier = resultTier === -1 ? 11 : resultTier;
@@ -158,6 +165,7 @@ setOnMerge((resultTier, _rainbow, midX, midY, bonusMerge, tierSkipped, bonusGemS
 
 // -- Black hole callback ----------------------------------------------------
 setOnBlackhole((tier, absorbed, totalPoints, x, y) => {
+  if (isHomeOpen()) return; // don't pollute run state during home demo
   scoring.score += totalPoints;
   const goldAmt = goldForTier(tier) * (absorbed + 1);
   addGold(goldAmt);
@@ -221,6 +229,16 @@ function gatherSave(): SaveData {
     maxCombo: state.maxCombo,
     gameOver: state.gameOver,
     level: getCurrentLevel(),
+    mode: getGameMode(),
+    ...(() => {
+      const s = getShakeStateForSave();
+      return {
+        shakePhase: s.phase,
+        shakePhaseTimer: s.phaseTimer,
+        shakeCountdownNum: s.countdownNum,
+        shakeScore: s.shakeScore,
+      };
+    })(),
     ...getShopSaveData(),
   };
 }
@@ -265,20 +283,78 @@ function restoreFromSave(save: SaveData): void {
 
   // Restore level
   if (save.level && save.level > 1) setLevel(save.level);
+
+  // Restore shake phase so refreshing in the shop doesn't rewind to
+  // level-complete (and doesn't let the player abuse refresh for extra shakes
+  // or re-rolled shop items).
+  if (save.shakePhase) {
+    restoreShakeState({
+      phase: save.shakePhase as ShakePhase,
+      phaseTimer: save.shakePhaseTimer ?? 0,
+      countdownNum: save.shakeCountdownNum ?? 3,
+      shakeScore: save.shakeScore ?? 0,
+    });
+  }
+
   restoreShopData(save as any);
 }
 
-// Try to restore a previous session on load
+// Always open the homepage on load. The player chooses Continue (if a save
+// is present) or New Run from there.
 const pendingSave = readSave();
-if (pendingSave && !pendingSave.gameOver) {
-  restoreFromSave(pendingSave);
-  paused = true; // start paused so player can orient
-  console.log(`[Persistence] Restored ${pendingSave.gems.length} gems, score ${pendingSave.score}`);
+const canContinue = !!pendingSave && !pendingSave.gameOver;
+paused = true;
+openHome(canContinue);
+
+/**
+ * Apply an action returned by the homepage click handler.
+ * - 'continue': restore the pending save (if any) and resume play.
+ * - 'new-run':  discard the save and start fresh in the current mode.
+ * - 'select-mode': mode was changed; no transition needed here.
+ */
+function processHomeAction(action: HomeAction): void {
+  if (action.type === 'continue') {
+    if (pendingSave && !pendingSave.gameOver) {
+      // Restore the mode the save was running in (default to classic if absent)
+      const savedMode = (pendingSave as any).mode ?? 'classic';
+      if (savedMode === 'classic' || savedMode === 'suika') {
+        setGameMode(savedMode);
+      }
+      scoring.highScore = loadHighScore();
+      restoreFromSave(pendingSave);
+    }
+    closeHome();
+    paused = false;
+    return;
+  }
+  if (action.type === 'new-run') {
+    clearSave();
+    scoring.highScore = loadHighScore();
+    restartGame();
+    closeHome();
+    paused = false;
+    return;
+  }
+  // 'select-mode': user picked a mode on the mode screen. setGameMode was
+  // already applied in the homepage click handler. If the mode actually
+  // changed, wipe the save so Continue doesn't resurrect a run from the
+  // other mode.
+  if (action.type === 'select-mode') {
+    if (pendingSave && (pendingSave as any).mode && (pendingSave as any).mode !== action.mode) {
+      clearSave();
+    }
+    // For saves without a `mode` field (pre-mode saves), assume classic — only
+    // clear when switching to Suika.
+    else if (pendingSave && !(pendingSave as any).mode && action.mode === 'suika') {
+      clearSave();
+    }
+  }
 }
 
 // -- Auto-save + auto-pause on blur / visibility change ---------------------
 function autoSaveAndPause(): void {
   if (state.gameOver) return;
+  if (isHomeOpen()) return; // nothing to save/resume from the homepage
   paused = true;
   writeSave(gatherSave());
 }
@@ -295,6 +371,7 @@ window.addEventListener('beforeunload', () => {
 let resumeCooldown = 0;
 function handleResume(e: Event): void {
   if (!paused) return;
+  if (isHomeOpen()) return; // home handles its own clicks
   paused = false;
   resumeCooldown = 0.3; // block firing for 300ms after resume
   e.stopImmediatePropagation();
@@ -360,6 +437,13 @@ installGameOverClickHandler(canvas, () => state.gameOver, restartGame);
 function handleMenuClick(clientX: number, clientY: number): void {
   const vp = screenToVirtual(canvas, clientX, clientY);
 
+  // Homepage takes priority over everything else
+  if (isHomeOpen()) {
+    const action = handleHomeClick(vp.x, vp.y);
+    if (action) processHomeAction(action);
+    return;
+  }
+
   // Shop clicks take priority
   if (isShopOpen()) {
     // Lock toggle clicks must run before buy clicks (lock button overlaps card)
@@ -408,6 +492,7 @@ const input = createInputHandler(canvas);
 
 input.onFire = (aimX, aimY) => {
   if (state.gameOver) return;
+  if (isHomeOpen()) return;
   if (fireCooldown > 0) return;
   if (resumeCooldown > 0) return;
   // Player can still fire during danger — countdown only resets when line is clear
@@ -432,12 +517,75 @@ input.onFire = (aimX, aimY) => {
   fireCooldown = 0.35;
 };
 
+// -- Homepage demo physics --------------------------------------------------
+// Random low-tier gems drop into the well while the home is open, merge
+// naturally, and fill it up. When it overflows we clear and restart the cycle.
+let homeDemoSpawnTimer = 0;
+
+function spawnHomeDemoGem(): void {
+  // Random tier 0-3 (spawn range — matches gameplay's MAX_SPAWN_TIER).
+  const tier = Math.floor(Math.random() * 4);
+  // Pick a random X across the well width, with a margin so the gem doesn't
+  // clip the wall. Drop from above the top so the entry looks natural.
+  const margin = 30;
+  const x = CX + margin + Math.random() * (CW - margin * 2);
+  const y = CY - 30;
+  const body = spawnGem(world, x, y, tier, false, false);
+  // Tiny spin for visual variety
+  setAngularVelocity(body, (Math.random() - 0.5) * 0.2);
+  // Slight horizontal drift so gems don't stack in a perfect column
+  setVelocity(body, (Math.random() - 0.5) * 60, 0);
+}
+
+function clearHomeDemoWorld(): void {
+  for (const b of dynamicBodies(world)) {
+    if (getGemData(b)) world.destroyBody(b);
+  }
+  resetMergeQueue();
+  particles.clear();
+}
+
+function runHomeDemo(dt: number): void {
+  // Advance physics
+  world.step(FIXED_DT);
+  processMerges(world);
+  const bods = dynamicBodies(world);
+  detectLandings(bods);
+  updateGemSparkles(dt, bods);
+  updateBlackholes(dt);
+  if (getSettings().showParticles) particles.update(dt);
+  updateTransition(dt);
+
+  // Spawn new gems at a steady, varied cadence
+  homeDemoSpawnTimer -= dt;
+  if (homeDemoSpawnTimer <= 0) {
+    spawnHomeDemoGem();
+    homeDemoSpawnTimer = 0.3 + Math.random() * 0.35;
+  }
+
+  // Reset the well when it overflows — creates an endlessly-shifting backdrop
+  if (checkOverflow(world)) {
+    clearHomeDemoWorld();
+  }
+}
+
 // -- Performance profiling (auto-start; use console __perfReport() for results)
 startProfiling();
 
 // -- Game loop: physics in update, drawing in render ------------------------
 startLoop({
   update(_dt: number) {
+    updateHome(_dt);
+
+    // Homepage: run a decorative physics demo. Random low-tier gems fall in,
+    // merge naturally, fill the well, then reset when it overflows. No
+    // gameplay state (scoring, level, stats) is mutated — see the merge
+    // callback's isHomeOpen() guard.
+    if (isHomeOpen()) {
+      runHomeDemo(_dt);
+      return;
+    }
+
     updateDropdown(_dt);
     updateShop(_dt);
     if (paused) return;
@@ -445,8 +593,8 @@ startLoop({
     fireCooldown = Math.max(0, fireCooldown - _dt);
     resumeCooldown = Math.max(0, resumeCooldown - _dt);
 
-    // Level interlude state machine
-    checkLevelUp(scoring.score);
+    // Level interlude state machine — Classic only. Suika is one continuous level.
+    if (getGameMode() === 'classic') checkLevelUp(scoring.score);
     const interludeBlocks = updateLevelShake(_dt);
 
     // Seal the well during countdown + shake + settling
@@ -568,12 +716,16 @@ startLoop({
     // Board background — blit from offscreen cache
     ctx.drawImage(getBoardCache(), 0, 0);
 
-    drawNextGemPanel(ctx, state.gemQueue.slice(1));
-    drawScoreHUD(ctx, scoring, getCurrentLevel(), pointsToNextLevel(scoring.score, getCurrentLevel()), getGold());
+    // HUD + danger zone are hidden behind the homepage so they don't leak
+    // through the darkening overlay.
+    if (!isHomeOpen()) {
+      drawNextGemPanel(ctx, state.gemQueue.slice(1));
+      drawScoreHUD(ctx, scoring, getCurrentLevel(), pointsToNextLevel(scoring.score, getCurrentLevel()), getGold());
 
-    // Danger zone indicator at top of container
-    const danger = getDangerLevel(world);
-    if (getSettings().showDangerWarning) drawDangerZone(ctx, danger, elapsedTime, overflowTimer / OVERFLOW_GRACE);
+      // Danger zone indicator at top of container
+      const danger = getDangerLevel(world);
+      if (getSettings().showDangerWarning) drawDangerZone(ctx, danger, elapsedTime, overflowTimer / OVERFLOW_GRACE);
+    }
 
     // Shake lid (glass panels sliding shut/open)
     drawShakeLid(ctx, getLidProgress());
@@ -611,7 +763,7 @@ startLoop({
     if (getSettings().showParticles && renderEffects) particles.render(ctx);
 
     // Launcher gem (on top of everything except overlays)
-    if (!state.gameOver) {
+    if (!state.gameOver && !isHomeOpen()) {
       drawLauncherGem(ctx, launcher.launchX, launcher.launchY, state.nextGem.def, elapsedTime, state.nextGem.heavy, state.nextGem.bonus, state.nextGem.blackhole);
     }
 
@@ -654,6 +806,9 @@ startLoop({
     }
 
     // Pause overlay (on top of everything)
-    if (paused) drawPauseOverlay(ctx);
+    if (paused && !isHomeOpen()) drawPauseOverlay(ctx);
+
+    // Homepage — always drawn on top when open
+    drawHome(ctx);
   },
 });

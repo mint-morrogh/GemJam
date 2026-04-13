@@ -122,8 +122,16 @@ export function updateCombo(scoring: ScoringState, now: number): void {
 // Score history (top 10 leaderboard)
 // ---------------------------------------------------------------------------
 
-const LS_SCORES_KEY = 'gemjam_scores';
+import { getGameMode, type GameMode } from './gameMode';
+
 const MAX_SCORE_ENTRIES = 10;
+
+/** Legacy keys (pre-mode). Read once to migrate into the classic-scoped slots. */
+const LEGACY_SCORES_KEY = 'gemjam_scores';
+const LEGACY_HIGH_SCORE_KEY = 'gemjam_high_score';
+
+function scoresKey(mode: GameMode): string { return `gemjam_scores_${mode}`; }
+function highScoreKey(mode: GameMode): string { return `gemjam_high_score_${mode}`; }
 
 export interface ScoreEntry {
   score: number;
@@ -131,9 +139,15 @@ export interface ScoreEntry {
   date: string; // ISO 8601
 }
 
-/** Load the persisted score history (top 10, descending). */
-export function loadScoreHistory(): ScoreEntry[] {
-  const raw = loadJSON<ScoreEntry[]>(LS_SCORES_KEY, []);
+/** Load the persisted score history (top 10, descending) for the given or current mode. */
+export function loadScoreHistory(mode: GameMode = getGameMode()): ScoreEntry[] {
+  let raw = loadJSON<ScoreEntry[]>(scoresKey(mode), []);
+  // One-time migration: if the mode-scoped key is empty and the legacy key
+  // has data, inherit it into "classic".
+  if ((!Array.isArray(raw) || raw.length === 0) && mode === 'classic') {
+    const legacy = loadJSON<ScoreEntry[]>(LEGACY_SCORES_KEY, []);
+    if (Array.isArray(legacy) && legacy.length > 0) raw = legacy;
+  }
   if (!Array.isArray(raw)) return [];
   return raw
     .filter(
@@ -148,46 +162,49 @@ export function loadScoreHistory(): ScoreEntry[] {
 }
 
 /**
- * Record a finished run into the score history.
- * Keeps only the top 10 entries. Returns the (possibly updated) list and the
- * rank (0-based index) of the new entry, or -1 if it didn't place.
+ * Record a finished run into the score history for the current mode.
+ * Returns the (possibly updated) list and the rank (0-based index) of the new
+ * entry, or -1 if it didn't place.
  */
 export function recordScore(scoring: ScoringState): { history: ScoreEntry[]; rank: number } {
+  const mode = getGameMode();
   const entry: ScoreEntry = {
     score: scoring.score,
     bestCombo: scoring.bestCombo,
     date: new Date().toISOString(),
   };
-  const history = loadScoreHistory();
+  const history = loadScoreHistory(mode);
   history.push(entry);
   history.sort((a, b) => b.score - a.score);
   if (history.length > MAX_SCORE_ENTRIES) history.length = MAX_SCORE_ENTRIES;
-  saveJSON(LS_SCORES_KEY, history);
+  saveJSON(scoresKey(mode), history);
 
   const rank = history.indexOf(entry);
   return { history, rank };
 }
 
 // ---------------------------------------------------------------------------
-// High score persistence (localStorage)
+// High score persistence (localStorage, per mode)
 // ---------------------------------------------------------------------------
 
-const LS_HIGH_SCORE_KEY = 'gemjam_high_score';
-
-/** Load saved high score from localStorage. Returns 0 if absent or invalid. */
-export function loadHighScore(): number {
-  const val = loadJSON<number>(LS_HIGH_SCORE_KEY, 0);
+/** Load saved high score for the given or current mode. */
+export function loadHighScore(mode: GameMode = getGameMode()): number {
+  let val = loadJSON<number>(highScoreKey(mode), 0);
+  if ((!Number.isFinite(val) || val === 0) && mode === 'classic') {
+    const legacy = loadJSON<number>(LEGACY_HIGH_SCORE_KEY, 0);
+    if (Number.isFinite(legacy) && legacy > 0) val = legacy;
+  }
   return Number.isFinite(val) && val >= 0 ? Math.floor(val) : 0;
 }
 
 /**
- * Persist high score to localStorage if the current score beats it.
+ * Persist high score for the current mode if the current score beats it.
  * Updates `scoring.highScore` in-place. Returns true if a new record was set.
  */
 export function saveHighScore(scoring: ScoringState): boolean {
   if (scoring.score <= scoring.highScore) return false;
   scoring.highScore = scoring.score;
-  saveJSON(LS_HIGH_SCORE_KEY, scoring.highScore);
+  saveJSON(highScoreKey(getGameMode()), scoring.highScore);
   return true;
 }
 

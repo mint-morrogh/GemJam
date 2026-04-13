@@ -298,14 +298,13 @@ export function drawDropdown(
     const hapticsSupported = isHapticsSupported();
     ctx.beginPath();
     ctx.roundRect(BTN_X, rowY, BTN_W, BTN_H, btnR);
-    ctx.fillStyle = isHapticsOn ? 'rgba(232, 144, 80, 0.15)' : 'rgba(100, 120, 150, 0.1)';
+    ctx.fillStyle = isHapticsOn ? 'rgba(80, 200, 120, 0.15)' : 'rgba(100, 120, 150, 0.1)';
     ctx.fill();
-    ctx.strokeStyle = isHapticsOn ? 'rgba(232, 144, 80, 0.4)' : 'rgba(100, 120, 150, 0.25)';
+    ctx.strokeStyle = isHapticsOn ? 'rgba(80, 200, 120, 0.4)' : 'rgba(100, 120, 150, 0.25)';
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    ctx.font = `bold ${IS_PORTRAIT ? 13 : 11}px monospace`;
-    ctx.fillStyle = isHapticsOn ? '#fb923c' : '#6b7280';
+    ctx.fillStyle = isHapticsOn ? '#4ade80' : '#6b7280';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const hapticsLabel = hapticsSupported

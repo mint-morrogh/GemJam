@@ -111,6 +111,23 @@ export const requestMotionPermission = requestShakePermission;
 export function getCurrentLevel(): number { return ls.level; }
 export function getShakePhase(): ShakePhase { return ls.phase; }
 
+/** Snapshot of shake-phase state for persistence. */
+export interface ShakeSave {
+  phase: ShakePhase;
+  phaseTimer: number;
+  countdownNum: number;
+  shakeScore: number;
+}
+export function getShakeStateForSave(): ShakeSave {
+  return { phase: ls.phase, phaseTimer: ls.phaseTimer, countdownNum: ls.countdownNum, shakeScore: ls.shakeScore };
+}
+export function restoreShakeState(s: ShakeSave): void {
+  ls.phase = s.phase;
+  ls.phaseTimer = s.phaseTimer;
+  ls.countdownNum = s.countdownNum;
+  ls.shakeScore = s.shakeScore;
+}
+
 /** Returns 0→1 for how closed the lid is (0=open, 1=sealed). */
 export function getLidProgress(): number {
   switch (ls.phase) {
@@ -308,8 +325,9 @@ export function drawLevelOverlay(ctx: CanvasRenderingContext2D, _time?: number):
 
       ctx.globalAlpha = Math.max(0, alpha);
 
-      // "LEVEL COMPLETE!" — scales with the animation
-      const titleSize = Math.round((IS_PORTRAIT ? 24 : 20) * scale);
+      // "LEVEL COMPLETE!" — scales with the animation. Fractional font sizes
+      // render subpixel-smooth on canvas; Math.round here caused visible stepping.
+      const titleSize = (IS_PORTRAIT ? 24 : 20) * scale;
       ctx.font = `bold ${titleSize}px monospace`;
       ctx.fillStyle = '#e8c44a';
       ctx.save();
@@ -320,7 +338,7 @@ export function drawLevelOverlay(ctx: CanvasRenderingContext2D, _time?: number):
       ctx.globalAlpha = Math.max(0, alpha);
 
       // Level number — bigger
-      const numSize = Math.round((IS_PORTRAIT ? 52 : 44) * scale);
+      const numSize = (IS_PORTRAIT ? 52 : 44) * scale;
       ctx.font = `bold ${numSize}px monospace`;
       ctx.fillStyle = '#ffffff';
       ctx.fillText(`Level ${ls.level}`, cx, cy + 20 * scale);
