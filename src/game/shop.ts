@@ -497,16 +497,6 @@ function rollShopItems(): void {
 export function openShop(): void {
   shopOpen = true;
   if (shopItems.length === 0) {
-    // Pay interest on carried-over gold BEFORE rolling items so the player
-    // sees the new total factored into affordability. Floating text is spawned
-    // by the caller (main.ts owns VIRTUAL_WIDTH/HEIGHT + float positioning).
-    if (interestRate > 0 && gold > 0) {
-      const bonus = Math.floor(gold * interestRate);
-      if (bonus > 0) {
-        gold += bonus;
-        lastInterestPaid = bonus;
-      }
-    }
     // Reset free rerolls for the new visit
     freeRerollsRemaining = freeRerollsPurchased;
     rollShopItems();
@@ -555,6 +545,16 @@ export function rerollShop(): boolean {
 }
 
 export function closeShop(): void {
+  // Pay interest on whatever gold is left AFTER the player finished shopping.
+  // This way spending your whole stack doesn't still earn interest on the
+  // pre-spend balance.
+  if (interestRate > 0 && gold > 0) {
+    const bonus = Math.floor(gold * interestRate);
+    if (bonus > 0) {
+      gold += bonus;
+      lastInterestPaid = bonus;
+    }
+  }
   shopOpen = false;
 }
 
@@ -744,14 +744,14 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, cx: number, y: nu
   return lines;
 }
 
-const CARD_W = IS_PORTRAIT ? 180 : 150;
-const CARD_H = IS_PORTRAIT ? 110 : 95;
+const CARD_W = IS_PORTRAIT ? 220 : 180;
+const CARD_H = IS_PORTRAIT ? 135 : 115;
 const CARD_GAP = IS_PORTRAIT ? 12 : 10;
 const COLS = IS_PORTRAIT ? 2 : 3;
 /** Rows grow with the slot count (base 6 → 8 max). */
 function getRows(): number { return Math.ceil(getSlotCount() / COLS); }
 
-const LOCK_BTN_SIZE = 22;
+const LOCK_BTN_SIZE = 28;
 
 /** Draw a small padlock icon centered on (cx, cy). */
 function drawLockIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, color: string, locked: boolean): void {
@@ -960,29 +960,29 @@ export function drawShop(ctx: CanvasRenderingContext2D): void {
 
       // Category label — rarity for normal items, UPGRADE for flat unlocks
       ctx.globalAlpha = contentAlpha;
-      ctx.font = `bold 9px monospace`;
+      ctx.font = `bold 10px monospace`;
       ctx.fillStyle = rc;
       ctx.fillText(
         flat ? 'UPGRADE' : RARITY_LABELS[item.rarity].toUpperCase(),
-        cx + CARD_W / 2, cy + 14,
+        cx + CARD_W / 2, cy + 16,
       );
 
       // Item name
-      ctx.font = `bold 11px monospace`;
+      ctx.font = `bold 13px monospace`;
       ctx.fillStyle = item.def.nameColor ?? '#ffffff';
-      ctx.fillText(item.def.name, cx + CARD_W / 2, cy + 32);
+      ctx.fillText(item.def.name, cx + CARD_W / 2, cy + 38);
 
       // Description (word-wrapped)
-      ctx.font = `10px monospace`;
+      ctx.font = `12px monospace`;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-      wrapText(ctx, item.def.description(item.pct), cx + CARD_W / 2, cy + 48, CARD_W - 16, 12);
+      wrapText(ctx, item.def.description(item.pct), cx + CARD_W / 2, cy + 58, CARD_W - 20, 14);
 
       // Cost
       const canAfford = gold >= item.cost;
-      ctx.font = `bold 13px monospace`;
+      ctx.font = `bold 15px monospace`;
       ctx.fillStyle = item.locked ? 'rgba(120, 120, 120, 0.8)'
         : (canAfford ? '#FBBF24' : '#f87171');
-      ctx.fillText(`${item.cost} gold`, cx + CARD_W / 2, cy + CARD_H - 18);
+      ctx.fillText(`${item.cost} gold`, cx + CARD_W / 2, cy + CARD_H - 20);
       ctx.globalAlpha = 1;
     }
 
@@ -996,7 +996,7 @@ export function drawShop(ctx: CanvasRenderingContext2D): void {
       ctx.strokeStyle = item.locked ? 'rgba(232, 196, 74, 0.6)' : 'rgba(255, 255, 255, 0.15)';
       ctx.lineWidth = 1;
       ctx.stroke();
-      drawLockIcon(ctx, lr.x + lr.w / 2, lr.y + lr.h / 2, 9, item.locked ? '#FBBF24' : 'rgba(255, 255, 255, 0.5)', item.locked);
+      drawLockIcon(ctx, lr.x + lr.w / 2, lr.y + lr.h / 2, 12, item.locked ? '#FBBF24' : 'rgba(255, 255, 255, 0.5)', item.locked);
     }
 
     // -- Unlock animation: big lock icon scaling out + fading --

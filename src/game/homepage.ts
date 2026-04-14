@@ -19,6 +19,7 @@ import { loadHighScore, loadScoreHistory } from './scoring';
 export type HomeAction =
   | { type: 'continue' }
   | { type: 'new-run' }
+  | { type: 'tutorial' }
   | { type: 'select-mode'; mode: GameMode };
 
 // ---------------------------------------------------------------------------
@@ -141,6 +142,8 @@ function mainButtonRects(): { label: string; x: number; y: number; w: number; h:
   btns.push({ label: 'NEW RUN', x: cx - BTN_W / 2, y, w: BTN_W, h: BTN_H, id: 'new-run' });
   y += BTN_H + BTN_GAP;
   btns.push({ label: 'GAME MODES', x: cx - BTN_W / 2, y, w: BTN_W, h: BTN_H, id: 'modes' });
+  y += BTN_H + BTN_GAP;
+  btns.push({ label: 'TUTORIAL', x: cx - BTN_W / 2, y, w: BTN_W, h: BTN_H, id: 'tutorial' });
 
   return btns;
 }
@@ -177,6 +180,7 @@ export function handleHomeClick(vx: number, vy: number): HomeAction | null {
         if (btn.id === 'continue') return { type: 'continue' };
         if (btn.id === 'new-run') return { type: 'new-run' };
         if (btn.id === 'modes') { state.submenu = 'modes'; state.elapsed = 0; return null; }
+        if (btn.id === 'tutorial') return { type: 'tutorial' };
       }
     }
   } else {

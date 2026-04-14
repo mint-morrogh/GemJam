@@ -15,6 +15,17 @@ const IS_MOBILE = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 // ---------------------------------------------------------------------------
 
 const NAV_H = 40;
+export function getNavHeight(): number { return NAV_H; }
+
+/** Rect for the auto-shake toggle button (mobile). Valid only when dropdown is open. */
+export function getAutoShakeBtnRect(): { x: number; y: number; w: number; h: number } {
+  return { x: BTN_X, y: _toggleY, w: BTN_W, h: BTN_H };
+}
+
+/** Rect for the fire-mode toggle button (mobile). Valid only when dropdown is open. */
+export function getFireModeBtnRect(): { x: number; y: number; w: number; h: number } {
+  return { x: BTN_X, y: _fireModeY, w: BTN_W, h: BTN_H };
+}
 const UPGRADE_ROW_H = 16;
 const ANIM_DUR = 0.25;
 

@@ -55,7 +55,7 @@ This project was initialized with HyperSpace. Follow these guidelines:
 ### Development Workflow
 
 1. **Task-Driven Development**: Always work from tracked tasks (use `hyperspace tasks` CLI)
-2. **Documentation First**: Update docs/CHANGELOG.md with all changes
+2. **Documentation First**: Update Obsidian/docs/CHANGELOG.md with all changes
 3. **Structure as Needed**: Create directories and files following best practices for the chosen stack
 
 ### Agent System
@@ -75,16 +75,16 @@ This project uses specialized AI agents defined in `.claude/agents/`:
 
 ### Key Documentation
 
-- **docs/PRD.md** - Product requirements (update as requirements evolve)
+- **Obsidian/docs/PRD.md** - Product requirements (update as requirements evolve)
 - **Nexus Board** - Task tracking via `hyperspace tasks` CLI
-- **docs/STRUCTURE.md** - Document architecture as you build
-- **docs/WORKFLOW.md** - Development processes
-- **docs/ADR.md** - Record architectural decisions
-- **docs/CHANGELOG.md** - Track all changes (MANDATORY before commits)
+- **Obsidian/docs/STRUCTURE.md** - Document architecture as you build
+- **Obsidian/docs/WORKFLOW.md** - Development processes
+- **Obsidian/docs/ADR.md** - Record architectural decisions
+- **Obsidian/docs/CHANGELOG.md** - Track all changes (MANDATORY before commits)
 
 ### Changelog Maintenance
 
-**CRITICAL**: Update `docs/CHANGELOG.md` before every commit.
+**CRITICAL**: Update `Obsidian/Obsidian/docs/CHANGELOG.md` before every commit.
 
 Categories:
 - **Added**: New features
@@ -96,7 +96,7 @@ Categories:
 
 ### Documentation Discipline
 
-**CRITICAL**: Whenever you make changes to the codebase, you MUST also update relevant documentation in the `docs/` folder:
+**CRITICAL**: Whenever you make changes to the codebase, you MUST also update relevant documentation in the `Obsidian/docs/` folder:
 
 | Document | Update When |
 |----------|-------------|
@@ -107,7 +107,7 @@ Categories:
 | **PRD.md** | Requirements clarified or changed during implementation |
 | **WORKFLOW.md** | Development process refined or changed |
 
-This discipline is required even in normal (non-Memento) sessions. The `docs/` folder is the project's memory - it enables:
+This discipline is required even in normal (non-Memento) sessions. The `Obsidian/docs/` folder is the project's memory - it enables:
 - Future sessions to understand context
 - Memento Loop Mode to operate effectively
 - Team members to stay in sync

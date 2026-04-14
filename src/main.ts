@@ -25,13 +25,19 @@ import { writeSave, readSave, clearSave } from './game/persistence';
 import { initShakeDetection, ensureMotionPermission, checkLevelUp, updateLevelShake, getShakeGravity, getShakePhase, getCurrentLevel, pointsToNextLevel, getLidProgress, resetLevelShake, setLevel, closeShopPhase, drawLevelOverlay, getShakeStateForSave, restoreShakeState } from './game/levelShake';
 import type { ShakePhase } from './game/levelShake';
 import { initHaptics, hapticMerge, hapticExplosion, hapticTierSkip, hapticBlackhole, hapticPrestige } from './game/haptics';
-import { getGameMode, setGameMode } from './game/gameMode';
+import { getGameMode, setGameMode, getPersistedMode } from './game/gameMode';
 import { isHomeOpen, openHome, closeHome, drawHome, handleHomeClick, updateHome, type HomeAction } from './game/homepage';
 import { isDropdownOpen, toggleDropdown, closeDropdown, updateDropdown, isClickInNav, isClickOnRestart, isClickOnBackdrop, handleAutoShakeToggle, handleFireModeToggle, handleHapticsToggle, drawDropdown } from './game/dropdown';
 import { getGold, addGold, goldForTier, spawnGoldText, spawnScoreText, spawnFloatingLabel, updateFloatingText, drawFloatingText, openShop, closeShop, clearShopForNextLevel, isShopOpen, buyItem, rerollShop, getShopClickIndex, isClickOnContinue, isClickOnReroll, drawShop, updateShop, resetShop, getShopSaveData, restoreShopData, getGoldEarnedThisRun, handleShopLockClick, consumeLastInterestPaid, getSkipThrowCharges, consumeSkipThrowCharge } from './game/shop';
 import { setOnBlackhole, resetBlackholeTracker, updateBlackholes, drawActiveBlackholes } from './game/blackhole';
 import type { SaveData, GemSnapshot } from './game/persistence';
 import { drawPauseOverlay } from './game/renderer';
+import {
+  startTutorial, endTutorial, isTutorialActive, canFireInTutorial,
+  notifyTap as notifyTutorialTap, notifyFired as notifyTutorialFired,
+  updateTutorial, drawTutorialHighlights, drawTutorialMessage,
+  tutorialCompletedThisTick, isTutorialMessageShowing,
+} from './game/tutorial';
 
 // -- Render quality auto-detection (before canvas so DPR cap applies) -------
 const detectedTier = autoDetectQuality();
@@ -229,7 +235,9 @@ function gatherSave(): SaveData {
     maxCombo: state.maxCombo,
     gameOver: state.gameOver,
     level: getCurrentLevel(),
-    mode: getGameMode(),
+    // gatherSave is only called outside tutorial mode (see autoSaveAndPause),
+    // but the narrow save type excludes 'tutorial' — fall back to persisted.
+    mode: getGameMode() === 'tutorial' ? getPersistedMode() as 'classic' | 'suika' : getGameMode() as 'classic' | 'suika',
     ...(() => {
       const s = getShakeStateForSave();
       return {
@@ -343,6 +351,20 @@ function processHomeAction(action: HomeAction): void {
     closeHome();
     return;
   }
+  if (action.type === 'tutorial') {
+    // Tutorial is session-only: clear any existing save so refresh always
+    // bounces back to the homepage, and switch into tutorial mode.
+    clearSave();
+    setGameMode('tutorial');
+    scoring.highScore = loadHighScore();
+    restartGame();
+    // restartGame leaves paused = true; unpause immediately so the tutorial
+    // beats drive the flow without a stale pause overlay.
+    paused = false;
+    closeHome();
+    startTutorial();
+    return;
+  }
   // 'select-mode': user picked a mode on the mode screen. setGameMode was
   // already applied in the homepage click handler. If the mode actually
   // changed, wipe the save so Continue doesn't resurrect a run from the
@@ -363,6 +385,7 @@ function processHomeAction(action: HomeAction): void {
 function autoSaveAndPause(): void {
   if (state.gameOver) return;
   if (isHomeOpen()) return; // nothing to save/resume from the homepage
+  if (getGameMode() === 'tutorial') { paused = true; return; } // never persist tutorial runs
   paused = true;
   writeSave(gatherSave());
 }
@@ -372,7 +395,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) autoSaveAndPause();
 });
 window.addEventListener('beforeunload', () => {
-  if (!state.gameOver) writeSave(gatherSave());
+  if (!state.gameOver && getGameMode() !== 'tutorial') writeSave(gatherSave());
 });
 
 // -- Resume on tap / click (capture phase — consumed before input handler) --
@@ -463,6 +486,17 @@ function handleMenuClick(clientX: number, clientY: number): void {
     return;
   }
 
+  // Tutorial: when a message is showing the tap ONLY dismisses the message.
+  // It must not propagate to nav/shop/fire etc. (the pseudo-pause is the whole
+  // point — the player is reading, not playing). We also cancel any in-flight
+  // aim so hold-and-release doesn't launch a gem the moment they lift off.
+  if (isTutorialMessageShowing()) {
+    notifyTutorialTap();
+    input.cancelAim();
+    resumeCooldown = 0.3; // swallow the trailing fire on this same tap
+    return;
+  }
+
   // Block menu clicks during the brief window after unpause/restart — stops
   // the same tap from also triggering shop buys, dropdown toggles, etc.
   if (resumeCooldown > 0) return;
@@ -489,7 +523,16 @@ function handleMenuClick(clientX: number, clientY: number): void {
     const idx = getShopClickIndex(vp.x, vp.y);
     if (idx >= 0) { buyItem(idx); return; }
     if (isClickOnReroll(vp.x, vp.y)) { rerollShop(); return; }
-    if (isClickOnContinue(vp.x, vp.y)) { closeShop(); clearShopForNextLevel(); closeShopPhase(); return; }
+    if (isClickOnContinue(vp.x, vp.y)) {
+      closeShop();
+      const bonus = consumeLastInterestPaid();
+      if (bonus > 0) {
+        spawnFloatingLabel(VIRTUAL_WIDTH / 2, VIRTUAL_HEIGHT / 2 - 40, `+${bonus} INTEREST`, '#FBBF24', 2.0, 18);
+      }
+      clearShopForNextLevel();
+      closeShopPhase();
+      return;
+    }
     return;
   }
 
@@ -501,6 +544,16 @@ function handleMenuClick(clientX: number, clientY: number): void {
     // Restart button
     if (isClickOnRestart(vp.x, vp.y)) {
       closeDropdown();
+      // Tutorial is a one-shot — "Restart" inside tutorial bounces to home
+      // instead of restarting the tutorial mid-run.
+      if (isTutorialActive()) {
+        endTutorial();
+        setGameMode(getPersistedMode());
+        clearSave();
+        paused = true;
+        openHome(false);
+        return;
+      }
       restartGame();
       return;
     }
@@ -536,6 +589,7 @@ input.onFire = (aimX, aimY) => {
   // Player can still fire during danger — countdown only resets when line is clear
   if (getShakePhase() !== 'playing') return;
   if (isDropdownOpen()) return;
+  if (!canFireInTutorial()) return;
   // Suppress fire when the aim lands on the skip-throw redo button, so clicking
   // the button doesn't both fire AND skip. Guard matches the render-side visibility.
   if (getSkipThrowCharges() > 0) {
@@ -559,6 +613,8 @@ input.onFire = (aimX, aimY) => {
 
   triggerQueueShift(spawn.def);
   fireCooldown = 0.35;
+
+  notifyTutorialFired();
 };
 
 // -- Homepage demo physics --------------------------------------------------
@@ -642,6 +698,21 @@ startLoop({
 
     updateDropdown(_dt);
     updateShop(_dt);
+
+    // Tutorial tick — polls UI state transitions to advance beats. Runs even
+    // while paused so the first-beat message stays alive across the spawn pause.
+    updateTutorial(_dt);
+    if (tutorialCompletedThisTick()) {
+      // Kick the player back to the homepage in whichever non-tutorial mode
+      // they had selected before starting the tutorial.
+      endTutorial();
+      setGameMode(getPersistedMode());
+      clearSave();
+      paused = true;
+      openHome(false);
+      return;
+    }
+
     if (paused) return;
     // Freeze the run timer once the game is over so the "Time Survived" stat
     // on the game-over screen doesn't keep ticking up while the player reads it.
@@ -698,12 +769,6 @@ startLoop({
     // still re-opens the shop UI instead of showing an empty field.
     if (getShakePhase() === 'shop' && !isShopOpen()) {
       openShop();
-      // If Interest upgrade paid out on open, show a floating "+N gold (X%)"
-      // in the middle of the shop backdrop for feedback.
-      const bonus = consumeLastInterestPaid();
-      if (bonus > 0) {
-        spawnFloatingLabel(VIRTUAL_WIDTH / 2, VIRTUAL_HEIGHT / 2 - 40, `+${bonus} INTEREST`, '#FBBF24', 2.0, 18);
-      }
     }
 
     // Skip physics + merges during banner/countdown/resume (but not during shake!)
@@ -858,6 +923,12 @@ startLoop({
     // Dropdown menu (over everything except game-over/pause)
     drawDropdown(ctx, scoring.score, scoring.highScore, getCurrentLevel(), pointsToNextLevel(scoring.score, getCurrentLevel()));
 
+    // Tutorial overlays — highlights draw first so the message backdrop dims
+    // the unrelated UI without washing out the glowing target.
+    if (isTutorialActive()) {
+      drawTutorialHighlights(ctx);
+      drawTutorialMessage(ctx);
+    }
 
     // Performance profiler — record frame and draw overlay
     const gemBodies = bodies.filter((b) => getGemData(b));

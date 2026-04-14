@@ -50,6 +50,27 @@ const STRIP_H = 55;
 const STRIP_Y = 42; // right below the top nav
 const STRIP_X = GRID.containerX;
 const STRIP_W = GRID.containerWidth;
+
+/** Bounding box of the next-gems strip (for tutorial/highlight overlays). */
+export function getNextGemsStripRect(): { x: number; y: number; w: number; h: number } {
+  return { x: STRIP_X, y: STRIP_Y, w: STRIP_W, h: STRIP_H };
+}
+
+/** Bounding rect of the red game-over danger line (y is the line itself). */
+export function getDangerLineRect(): { x: number; y: number; w: number } {
+  return { x: GRID.containerX, y: GRID.containerY, w: GRID.containerWidth };
+}
+
+/**
+ * Bounding rect of the "NEXT LVL" / combo readout in the top HUD.
+ * Used by the tutorial highlight system — roughly a tight box around the
+ * centered label+value pair.
+ */
+export function getNextLevelHudRect(): { x: number; y: number; w: number; h: number } {
+  const w = 90;
+  const h = 32;
+  return { x: VIRTUAL_WIDTH / 2 - w / 2, y: 4, w, h };
+}
 /** Horizontal spacing between gem centers in the bottom strip. */
 const GEM_SLOT_SPACING = IS_PORTRAIT ? 68 : 60;
 const GEM_SLOT_COUNT = 5;

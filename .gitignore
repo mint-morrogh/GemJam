@@ -42,3 +42,7 @@ Desktop.ini
 
 # Memento loop working files
 memento/
+Obsidian/
+
+# Python cache
+__pycache__/
