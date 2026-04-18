@@ -80,7 +80,7 @@ const BEATS: Beat[] = [
   },
   { kind: 'freeplay', shots: 2 },
   { kind: 'message', text: `The top nav also shows your upgrades as you unlock them.` },
-  { kind: 'message', text: `Check the next-gems strip to plan combos ahead of time.`, highlight: 'next-gems' },
+  { kind: 'message', text: `Check the next 3 gems in the strip to plan combos ahead of time.`, highlight: 'next-gems' },
   // Keep the next-gems glow up while the player takes a few shots and sees it.
   { kind: 'freeplay', shots: 2, highlight: 'next-gems' },
   { kind: 'message', text: `Combos earn you more gold and points.` },

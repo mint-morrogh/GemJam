@@ -43,13 +43,46 @@ const BTN_H = IS_PORTRAIT ? 76 : 56;
 const TOP_NAV_H = 40;
 
 // ---------------------------------------------------------------------------
-// Bottom next-gem strip layout
+// Action pill rail (top band — replaces the old wide next-gems strip)
 // ---------------------------------------------------------------------------
+// Reserved row of 5 slot-sized pills. Slot 0 is Skip Throw. Slots 1–4 are
+// locked placeholders for future unlockable mechanics — they render grayed
+// out by default so the player can see what's coming.
 
-const STRIP_H = 55;
-const STRIP_Y = 42; // right below the top nav
-const STRIP_X = GRID.containerX;
-const STRIP_W = GRID.containerWidth;
+const PILL_W = 54;
+const PILL_H = 30;
+const PILL_GAP = 6;
+const PILL_COUNT = 5;
+const PILL_RAIL_BAND_Y = 42;
+const PILL_RAIL_BAND_H = 55;
+const PILL_RAIL_Y = PILL_RAIL_BAND_Y + (PILL_RAIL_BAND_H - PILL_H) / 2;
+
+function getPillSlotRect(index: number): { x: number; y: number; w: number; h: number } {
+  const totalW = PILL_COUNT * PILL_W + (PILL_COUNT - 1) * PILL_GAP;
+  const railStartX = GRID.containerX + (GRID.containerWidth - totalW) / 2;
+  return {
+    x: railStartX + index * (PILL_W + PILL_GAP),
+    y: PILL_RAIL_Y,
+    w: PILL_W,
+    h: PILL_H,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Next-gems strip (right of launcher)
+// ---------------------------------------------------------------------------
+// Horizontal row of 3 upcoming gems with arrow indicators pointing toward
+// the launcher. Anchored to a fixed offset from the launcher center (based
+// on the largest launcher gem tier) so it doesn't shift between shots.
+
+const LAUNCHER_MAX_GEM_R = 36;
+const GEM_SLOT_SPACING = 60;
+const GEM_SLOT_COUNT = 3;
+const STRIP_PAD_X = 16;
+const STRIP_H = 48;
+const STRIP_W = STRIP_PAD_X * 2 + (GEM_SLOT_COUNT - 1) * GEM_SLOT_SPACING + 40;
+const STRIP_X = GRID.containerX + GRID.containerWidth / 2 + LAUNCHER_MAX_GEM_R + 12;
+const STRIP_Y = (GRID.containerY - 20) - STRIP_H / 2;
 
 /** Bounding box of the next-gems strip (for tutorial/highlight overlays). */
 export function getNextGemsStripRect(): { x: number; y: number; w: number; h: number } {
@@ -71,9 +104,6 @@ export function getNextLevelHudRect(): { x: number; y: number; w: number; h: num
   const h = 32;
   return { x: VIRTUAL_WIDTH / 2 - w / 2, y: 4, w, h };
 }
-/** Horizontal spacing between gem centers in the bottom strip. */
-const GEM_SLOT_SPACING = IS_PORTRAIT ? 68 : 60;
-const GEM_SLOT_COUNT = 5;
 
 // ---------------------------------------------------------------------------
 // Board styling — dark arcade palette (BookBreaker-inspired)
@@ -156,11 +186,13 @@ export function drawLauncherGem(
   ctx.stroke();
   ctx.restore();
 
-  // Dashed circle showing exact physics size (so player can judge how big it'll be)
+  // Dashed circle showing exact physics size (so player can judge how big it'll be).
+  // Sits a few px outside the gem edge so the outline is clearly visible rather than
+  // blending with the sprite border.
   ctx.save();
   ctx.beginPath();
-  ctx.arc(launchX, launchY, actualR, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+  ctx.arc(launchX, launchY, actualR + 4, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
   ctx.lineWidth = 1;
   ctx.setLineDash([3, 3]);
   ctx.stroke();
@@ -221,76 +253,136 @@ export function drawLauncherGem(
 }
 
 /**
- * Skip-throw button — floats next to the launcher gem. Only visible when the
- * player has charges. Tapping it discards the current gem and advances the queue.
+ * Action pill rail — row of 5 slots in the top band. Slot 0 is Skip Throw
+ * (active when charges > 0, grayed when idle). Slots 1–4 are locked
+ * placeholders for future unlockable mechanics.
  */
-const SKIP_BTN_SIZE = 30;
-
-export function getSkipThrowButtonRect(launchX: number, launchY: number, gemRadius: number): { x: number; y: number; w: number; h: number } {
-  // Upper-right of the launcher gem, outside the physics circle so it never
-  // occludes the gem art.
-  const cx = launchX + gemRadius + 8 + SKIP_BTN_SIZE / 2;
-  const cy = launchY - gemRadius - 4 - SKIP_BTN_SIZE / 2;
-  return { x: cx - SKIP_BTN_SIZE / 2, y: cy - SKIP_BTN_SIZE / 2, w: SKIP_BTN_SIZE, h: SKIP_BTN_SIZE };
+export function getSkipThrowButtonRect(): { x: number; y: number; w: number; h: number } {
+  return getPillSlotRect(0);
 }
 
-export function drawSkipThrowButton(
+export function drawActionPillRail(
   ctx: CanvasRenderingContext2D,
-  launchX: number,
-  launchY: number,
-  gemRadius: number,
+  skipCharges: number,
+  time: number,
+): void {
+  // Slot 0 — Skip Throw
+  const r0 = getPillSlotRect(0);
+  if (skipCharges > 0) drawSkipPill(ctx, r0, skipCharges, time);
+  else drawLockedPill(ctx, r0);
+
+  // Slots 1..N-1 — locked placeholders for future unlocks.
+  for (let i = 1; i < PILL_COUNT; i++) {
+    drawLockedPill(ctx, getPillSlotRect(i));
+  }
+}
+
+function pillPath(ctx: CanvasRenderingContext2D, r: { x: number; y: number; w: number; h: number }): void {
+  const cy = r.y + r.h / 2;
+  const radius = r.h / 2;
+  ctx.beginPath();
+  ctx.moveTo(r.x + radius, r.y);
+  ctx.lineTo(r.x + r.w - radius, r.y);
+  ctx.arc(r.x + r.w - radius, cy, radius, -Math.PI / 2, Math.PI / 2);
+  ctx.lineTo(r.x + radius, r.y + r.h);
+  ctx.arc(r.x + radius, cy, radius, Math.PI / 2, -Math.PI / 2);
+  ctx.closePath();
+}
+
+function drawSkipPill(
+  ctx: CanvasRenderingContext2D,
+  r: { x: number; y: number; w: number; h: number },
   charges: number,
   time: number,
 ): void {
-  if (charges <= 0) return;
-  const r = getSkipThrowButtonRect(launchX, launchY, gemRadius);
-  const cx = r.x + r.w / 2;
   const cy = r.y + r.h / 2;
-
   ctx.save();
 
-  // Soft pulse when a new charge is pending (subtle idle animation).
   const pulse = 0.5 + 0.5 * Math.sin(time * 2.5);
 
-  // Button background
-  ctx.beginPath();
-  ctx.arc(cx, cy, r.w / 2, 0, Math.PI * 2);
+  pillPath(ctx, r);
   ctx.fillStyle = 'rgba(20, 40, 50, 0.85)';
   ctx.fill();
   ctx.strokeStyle = `rgba(103, 232, 249, ${0.5 + pulse * 0.4})`;
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  // Redo arrow glyph (stylized circular arrow)
-  ctx.strokeStyle = '#67E8F9';
-  ctx.lineWidth = 2;
-  ctx.lineCap = 'round';
+  const dividerX = r.x + r.w * 0.55;
+  ctx.strokeStyle = 'rgba(103, 232, 249, 0.25)';
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.arc(cx, cy, r.w * 0.28, Math.PI * 0.3, Math.PI * 1.85);
-  ctx.stroke();
-  // Arrowhead at the arc's end
-  const endAng = Math.PI * 1.85;
-  const ax = cx + Math.cos(endAng) * r.w * 0.28;
-  const ay = cy + Math.sin(endAng) * r.w * 0.28;
-  ctx.beginPath();
-  ctx.moveTo(ax, ay);
-  ctx.lineTo(ax + 4, ay - 2);
-  ctx.moveTo(ax, ay);
-  ctx.lineTo(ax + 2, ay + 4);
+  ctx.moveTo(dividerX, r.y + 5);
+  ctx.lineTo(dividerX, r.y + r.h - 5);
   ctx.stroke();
 
-  // Charge count badge (top-right of button)
-  const bx = cx + r.w * 0.3;
-  const by = cy - r.w * 0.3;
-  ctx.beginPath();
-  ctx.arc(bx, by, 8, 0, Math.PI * 2);
+  const glyphCx = r.x + r.w * 0.275;
+  const glyphR = 8;
+  const arcStart = Math.PI * 0.15;
+  const arcEnd = Math.PI * 1.85;
+  ctx.strokeStyle = '#67E8F9';
   ctx.fillStyle = '#67E8F9';
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'butt';
+  ctx.beginPath();
+  ctx.arc(glyphCx, cy, glyphR, arcStart, arcEnd);
+  ctx.stroke();
+  const endX = glyphCx + Math.cos(arcEnd) * glyphR;
+  const endY = cy + Math.sin(arcEnd) * glyphR;
+  const tanX = -Math.sin(arcEnd);
+  const tanY = Math.cos(arcEnd);
+  const radX = Math.cos(arcEnd);
+  const radY = Math.sin(arcEnd);
+  const tipLen = 5.5;
+  const halfW = 4;
+  ctx.beginPath();
+  ctx.moveTo(endX + tanX * tipLen, endY + tanY * tipLen);
+  ctx.lineTo(endX + radX * halfW, endY + radY * halfW);
+  ctx.lineTo(endX - radX * halfW, endY - radY * halfW);
+  ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = '#042f3a';
-  ctx.font = `bold 10px monospace`;
+
+  const countCx = r.x + r.w * 0.775;
+  ctx.fillStyle = '#67E8F9';
+  ctx.font = `bold 14px monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(`${charges}`, bx, by + 0.5);
+  ctx.fillText(`${charges}`, countCx, cy + 0.5);
+
+  ctx.restore();
+}
+
+function drawLockedPill(
+  ctx: CanvasRenderingContext2D,
+  r: { x: number; y: number; w: number; h: number },
+): void {
+  const cx = r.x + r.w / 2;
+  const cy = r.y + r.h / 2;
+  ctx.save();
+
+  pillPath(ctx, r);
+  ctx.fillStyle = 'rgba(25, 30, 40, 0.55)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(140, 160, 180, 0.22)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Padlock icon, centered
+  ctx.strokeStyle = 'rgba(170, 190, 210, 0.45)';
+  ctx.fillStyle = 'rgba(170, 190, 210, 0.45)';
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = 'round';
+  // Shackle (arc)
+  ctx.beginPath();
+  ctx.arc(cx, cy - 1, 4, Math.PI, 0);
+  ctx.stroke();
+  // Body (rounded rect)
+  const bodyW = 11;
+  const bodyH = 8;
+  const bx = cx - bodyW / 2;
+  const by = cy - 1;
+  ctx.beginPath();
+  ctx.roundRect(bx, by, bodyW, bodyH, 2);
+  ctx.fill();
 
   ctx.restore();
 }
@@ -447,53 +539,21 @@ function drawStripGem(
 }
 
 /**
- * Draw the polished "NEXT" strip below the bucket.
- * Glass-style background, gems with glow, arrow flow indicators.
+ * Draw the next-gems preview strip (right of launcher).
+ * Borderless — gems float with arrow flow indicators. The tutorial draws its
+ * own glow on top when highlighting this rect.
  */
 export function drawNextGemPanel(ctx: CanvasRenderingContext2D, queue: readonly { def: GemDef; heavy: boolean; bonus: boolean; blackhole: boolean }[]): void {
   const sx = STRIP_X;
   const sy = STRIP_Y;
   const sw = STRIP_W;
   const sh = STRIP_H;
-  const R = 14;
   const centerY = sy + sh / 2;
 
-  // -- Glass-style background (matches bucket aesthetic) ----------------------
-  ctx.beginPath();
-  ctx.roundRect(sx, sy, sw, sh, R);
-  ctx.fillStyle = 'rgba(8, 12, 20, 0.5)';
-  ctx.fill();
-
-  // Inner glow
   ctx.save();
-  ctx.beginPath();
-  ctx.roundRect(sx, sy, sw, sh, R);
-  ctx.clip();
-  const innerGlow = ctx.createRadialGradient(sx + sw / 2, sy, 0, sx + sw / 2, sy, sw * 0.4);
-  innerGlow.addColorStop(0, 'rgba(140, 180, 230, 0.04)');
-  innerGlow.addColorStop(1, 'rgba(140, 180, 230, 0)');
-  ctx.fillStyle = innerGlow;
-  ctx.beginPath();
-  ctx.ellipse(sx + sw / 2, sy, sw * 0.4, 10, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
 
-  // Border
-  ctx.beginPath();
-  ctx.roundRect(sx, sy, sw, sh, R);
-  ctx.strokeStyle = 'rgba(140, 180, 230, 0.1)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-
-  // -- Gem slots (animated) ---------------------------------------------------
-  ctx.save();
-  ctx.beginPath();
-  ctx.roundRect(sx, sy, sw, sh, R);
-  ctx.clip();
-
-  const gemAreaStart = sx + 20;
-  const gemAreaWidth = sw - 40;
+  const gemAreaStart = sx + STRIP_PAD_X;
+  const gemAreaWidth = sw - STRIP_PAD_X * 2;
   const animating = queueAnim.active;
   const t = animating ? 1 - (1 - queueAnim.progress) * (1 - queueAnim.progress) : 1;
   const slideOffset = (1 - t) * GEM_SLOT_SPACING;
@@ -567,7 +627,7 @@ export function drawNextGemPanel(ctx: CanvasRenderingContext2D, queue: readonly 
     }
   }
 
-  ctx.restore(); // remove clip
+  ctx.restore();
 }
 
 // ---------------------------------------------------------------------------

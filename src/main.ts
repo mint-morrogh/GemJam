@@ -2,7 +2,7 @@ import './style.css';
 import { createCanvas, initResize, VIRTUAL_WIDTH, VIRTUAL_HEIGHT } from './canvas';
 import { createWorld, createStaticRect, createCornerArc as createCornerArcBodies, dynamicBodies, bodyPos, bodyVel, setVelocity, setAngularVelocity } from './physics/planckWorld';
 import { startLoop, getStats, FIXED_DT } from './engine/gameLoop';
-import { drawPhysicsGems, drawGemShimmers, drawNextGemPanel, drawDangerZone, drawScoreHUD, drawLauncherGem, drawTrajectory, drawShakeLid, triggerQueueShift, updateQueueAnimation, resetQueueAnimation, drawSkipThrowButton, getSkipThrowButtonRect } from './game/renderer';
+import { drawPhysicsGems, drawGemShimmers, drawNextGemPanel, drawDangerZone, drawScoreHUD, drawLauncherGem, drawTrajectory, drawShakeLid, triggerQueueShift, updateQueueAnimation, resetQueueAnimation, drawActionPillRail, getSkipThrowButtonRect } from './game/renderer';
 import { renderGameOver, installGameOverClickHandler, startGameOverAnim, updateGameOverAnim, resetGameOverAnim } from './game/gameOverScreen';
 import { createInputHandler } from './game/input';
 import { createGameState, consumeNextGem, checkOverflow, resetGameState, getDangerLevel } from './game/state';
@@ -505,7 +505,7 @@ function handleMenuClick(clientX: number, clientY: number): void {
   // actively playing (no shop/interlude/game-over). Check before the fire
   // input so a tap on the button doesn't also launch a gem.
   if (!state.gameOver && !isShopOpen() && !isDropdownOpen() && getShakePhase() === 'playing' && getSkipThrowCharges() > 0) {
-    const sr = getSkipThrowButtonRect(launcher.launchX, launcher.launchY, state.nextGem.def.radius);
+    const sr = getSkipThrowButtonRect();
     if (vp.x >= sr.x && vp.x <= sr.x + sr.w && vp.y >= sr.y && vp.y <= sr.y + sr.h) {
       if (consumeSkipThrowCharge()) {
         const discarded = consumeNextGem(state);
@@ -595,7 +595,7 @@ input.onFire = (aimX, aimY) => {
   // Suppress fire when the aim lands on the skip-throw redo button, so clicking
   // the button doesn't both fire AND skip. Guard matches the render-side visibility.
   if (getSkipThrowCharges() > 0) {
-    const sr = getSkipThrowButtonRect(launcher.launchX, launcher.launchY, state.nextGem.def.radius);
+    const sr = getSkipThrowButtonRect();
     if (aimX >= sr.x && aimX <= sr.x + sr.w && aimY >= sr.y && aimY <= sr.y + sr.h) return;
   }
 
@@ -904,9 +904,10 @@ startLoop({
     // Launcher gem (on top of everything except overlays)
     if (!state.gameOver && !isHomeOpen()) {
       drawLauncherGem(ctx, launcher.launchX, launcher.launchY, state.nextGem.def, elapsedTime, state.nextGem.heavy, state.nextGem.bonus, state.nextGem.blackhole);
-      // Skip-throw redo button — only while playing (hidden during shake/shop/interlude)
+      // Action pill rail — slot 0 is Skip Throw, slots 1–4 are locked placeholders.
+      // Only while playing (hidden during shake/shop/interlude).
       if (getShakePhase() === 'playing') {
-        drawSkipThrowButton(ctx, launcher.launchX, launcher.launchY, state.nextGem.def.radius, getSkipThrowCharges(), elapsedTime);
+        drawActionPillRail(ctx, getSkipThrowCharges(), elapsedTime);
       }
     }
 
