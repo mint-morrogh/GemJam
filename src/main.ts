@@ -516,26 +516,8 @@ function handleMenuClick(clientX: number, clientY: number): void {
     }
   }
 
-  // Shop clicks take priority
-  if (isShopOpen()) {
-    // Lock toggle clicks must run before buy clicks (lock button overlaps card)
-    if (handleShopLockClick(vp.x, vp.y)) return;
-    const idx = getShopClickIndex(vp.x, vp.y);
-    if (idx >= 0) { buyItem(idx); return; }
-    if (isClickOnReroll(vp.x, vp.y)) { rerollShop(); return; }
-    if (isClickOnContinue(vp.x, vp.y)) {
-      closeShop();
-      const bonus = consumeLastInterestPaid();
-      if (bonus > 0) {
-        spawnFloatingLabel(VIRTUAL_WIDTH / 2, VIRTUAL_HEIGHT / 2 - 40, `+${bonus} INTEREST`, '#FBBF24', 2.0, 18);
-      }
-      clearShopForNextLevel();
-      closeShopPhase();
-      return;
-    }
-    return;
-  }
-
+  // Dropdown takes priority over shop — it draws on top and the player must
+  // be able to open/close it even while the shop overlay is up.
   if (isDropdownOpen()) {
     // Auto-shake toggle (also triggers motion permission request on iOS)
     if (handleAutoShakeToggle(vp.x, vp.y)) return;
@@ -565,9 +547,29 @@ function handleMenuClick(clientX: number, clientY: number): void {
     return;
   }
 
-  // Tap on nav bar → toggle dropdown (no pause)
+  // Tap on nav bar → toggle dropdown (allowed during shop too)
   if (isClickInNav(vp.y) && !state.gameOver) {
     toggleDropdown();
+    return;
+  }
+
+  // Shop clicks
+  if (isShopOpen()) {
+    // Lock toggle clicks must run before buy clicks (lock button overlaps card)
+    if (handleShopLockClick(vp.x, vp.y)) return;
+    const idx = getShopClickIndex(vp.x, vp.y);
+    if (idx >= 0) { buyItem(idx); return; }
+    if (isClickOnReroll(vp.x, vp.y)) { rerollShop(); return; }
+    if (isClickOnContinue(vp.x, vp.y)) {
+      closeShop();
+      const bonus = consumeLastInterestPaid();
+      if (bonus > 0) {
+        spawnFloatingLabel(VIRTUAL_WIDTH / 2, VIRTUAL_HEIGHT / 2 - 40, `+${bonus} INTEREST`, '#FBBF24', 2.0, 18);
+      }
+      clearShopForNextLevel();
+      closeShopPhase();
+      return;
+    }
     return;
   }
 }

@@ -68,7 +68,7 @@ export function processMerges(world: World): Body[] {
     let bonusGemSpawned = false;
     const bgsChance = getBonusGemSpawnChance();
     if (bgsChance > 0 && Math.random() < bgsChance) {
-      const bonusTier = Math.max(0, event.nextTier - 2 - Math.floor(Math.random() * 2));
+      const bonusTier = Math.max(0, event.nextTier - 1 - Math.floor(Math.random() * 3));
       const offsetAngle = Math.random() * Math.PI * 2;
       const offsetDist = 30 + Math.random() * 20;
       const bx = event.midX + Math.cos(offsetAngle) * offsetDist;
