@@ -175,39 +175,31 @@ export function drawLauncherGem(
   // Bonus gem: golden aura
   if (bonus) drawBonusAura(ctx, launchX, launchY, displayR, time, 1);
 
-  // Pulsing glow ring
+  // Pulsing glow ring — gem-colored with soft outer bloom
   const pulse = 0.5 + 0.5 * Math.sin(time * 3);
   ctx.save();
+  ctx.shadowColor = gemDef.color;
+  ctx.shadowBlur = 10 + pulse * 6;
   ctx.beginPath();
   ctx.arc(launchX, launchY, displayR + 6 + pulse * 3, 0, Math.PI * 2);
   ctx.strokeStyle = gemDef.color;
-  ctx.globalAlpha = 0.15 + 0.1 * pulse;
+  ctx.globalAlpha = 0.5 + 0.3 * pulse;
   ctx.lineWidth = 2;
   ctx.stroke();
-  ctx.restore();
-
-  // Dashed circle showing exact physics size (so player can judge how big it'll be).
-  // Sits a few px outside the gem edge so the outline is clearly visible rather than
-  // blending with the sprite border.
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(launchX, launchY, actualR + 4, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([3, 3]);
-  ctx.stroke();
-  ctx.setLineDash([]);
   ctx.restore();
 
   // Gem sprite or circle fallback — drawn at display size
   ctx.save();
   const sprite = getGemSprite(gemDef.id);
   if (sprite) {
+    // Isolate the clip so it doesn't carry over to later draws in this function.
+    ctx.save();
     ctx.beginPath();
     ctx.arc(launchX, launchY, displayR, 0, Math.PI * 2);
     ctx.clip();
     const size = displayR * 2;
     ctx.drawImage(sprite, launchX - displayR, launchY - displayR, size, size);
+    ctx.restore();
   } else {
     ctx.beginPath();
     ctx.arc(launchX, launchY, displayR, 0, Math.PI * 2);
@@ -243,12 +235,30 @@ export function drawLauncherGem(
     ctx.restore();
   }
 
-  // Tier label below the gem
-  ctx.font = `bold ${IS_PORTRAIT ? 11 : 10}px monospace`;
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+  // Loaded-gem label — single line to the LEFT of the launcher, right-aligned,
+  // vertically centered, symmetric with the next-gems strip on the right.
+  // Format: "[Lvl N] Name" plus " (Special)" suffix when applicable. Only shown
+  // on the currently-loaded launcher gem.
+  let specialWord: string | null = null;
+  let labelColor = 'rgba(255, 255, 255, 0.75)';
+  if (heavy) { specialWord = 'Heavy'; labelColor = '#d9d9d9'; }
+  else if (blackhole) { specialWord = 'Black Hole'; labelColor = '#c084fc'; }
+  else if (bonus) { specialWord = 'Bonus'; labelColor = '#FBBF24'; }
+  const baseLabel = `[Lvl ${gemDef.id}] ${capitalizeGemType(gemDef.type)}`;
+  const fullLabel = specialWord ? `${baseLabel} (${specialWord})` : baseLabel;
+  // Center the label within the mirror of the next-gems strip: the strip
+  // occupies [launchX + 48, launchX + 240] on the right, so the label sits
+  // centered at launchX - (48 + STRIP_W/2) = launchX - 144.
+  const mirrorCenterX = launchX - 36 - 12 - 96; // 96 = STRIP_W/2 (192/2)
+  ctx.font = `bold ${IS_PORTRAIT ? 12 : 11}px monospace`;
+  ctx.fillStyle = labelColor;
   ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  ctx.fillText(gemDef.type, launchX, launchY + displayR + 4);
+  ctx.textBaseline = 'middle';
+  if (specialWord) {
+    ctx.shadowColor = labelColor;
+    ctx.shadowBlur = 6;
+  }
+  ctx.fillText(fullLabel, mirrorCenterX, launchY);
   ctx.restore();
 }
 
@@ -538,6 +548,10 @@ function drawStripGem(
   ctx.restore();
 }
 
+function capitalizeGemType(type: string): string {
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
 /**
  * Draw the next-gems preview strip (right of launcher).
  * Borderless — gems float with arrow flow indicators. The tutorial draws its
@@ -561,8 +575,9 @@ export function drawNextGemPanel(ctx: CanvasRenderingContext2D, queue: readonly 
   const totalGemsWidth = (GEM_SLOT_COUNT - 1) * GEM_SLOT_SPACING;
   const firstSlotX = gemAreaStart + (gemAreaWidth - totalGemsWidth) / 2;
 
-  // Flow arrows between gem slots (pointing left toward next-to-fire)
-  for (let i = 0; i < GEM_SLOT_COUNT - 1; i++) {
+  // Flow arrows: between gem slots AND one extra arrow left of slot 0 pointing
+  // at the launcher gem so the full queue → launcher flow reads visually.
+  for (let i = -1; i < GEM_SLOT_COUNT - 1; i++) {
     const arrowX = firstSlotX + (i + 0.5) * GEM_SLOT_SPACING + slideOffset;
     ctx.save();
     ctx.globalAlpha = 0.3;
