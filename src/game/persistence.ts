@@ -26,6 +26,8 @@ export interface SaveData {
   gems: GemSnapshot[];
   /** Upcoming gem queue as tier indices. */
   queue: number[];
+  /** Parallel flag array — true marks a queue slot as an essence (wildcard merge). */
+  queueEssence?: boolean[];
   /** Scoring state. */
   score: number;
   highScore: number;
@@ -47,6 +49,12 @@ export interface SaveData {
   shakePhaseTimer?: number;
   shakeCountdownNum?: number;
   shakeScore?: number;
+  /** Banked shake pill charges earned from leveling up. */
+  shakeCharges?: number;
+  /** True if the currently-running shake was player-triggered. */
+  shakeManual?: boolean;
+  /** Order in which action-rail abilities were first unlocked. */
+  abilityRail?: ('skip_throw' | 'shake' | 'essence')[];
   /** Game mode the save belongs to — used for cross-mode collision checks. */
   mode?: 'classic' | 'suika';
 }

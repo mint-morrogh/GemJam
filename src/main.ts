@@ -2,10 +2,10 @@ import './style.css';
 import { createCanvas, initResize, VIRTUAL_WIDTH, VIRTUAL_HEIGHT } from './canvas';
 import { createWorld, createStaticRect, createCornerArc as createCornerArcBodies, dynamicBodies, bodyPos, bodyVel, setVelocity, setAngularVelocity } from './physics/planckWorld';
 import { startLoop, getStats, FIXED_DT } from './engine/gameLoop';
-import { drawPhysicsGems, drawGemShimmers, drawNextGemPanel, drawDangerZone, drawScoreHUD, drawLauncherGem, drawTrajectory, drawShakeLid, triggerQueueShift, updateQueueAnimation, resetQueueAnimation, drawActionPillRail, getSkipThrowButtonRect } from './game/renderer';
+import { drawPhysicsGems, drawGemShimmers, drawNextGemPanel, drawDangerZone, drawScoreHUD, drawLauncherGem, drawTrajectory, drawShakeLid, triggerQueueShift, updateQueueAnimation, resetQueueAnimation, drawActionPillRail, getPillHit } from './game/renderer';
 import { renderGameOver, installGameOverClickHandler, startGameOverAnim, updateGameOverAnim, resetGameOverAnim } from './game/gameOverScreen';
 import { createInputHandler } from './game/input';
-import { createGameState, consumeNextGem, checkOverflow, resetGameState, getDangerLevel } from './game/state';
+import { createGameState, consumeNextGem, checkOverflow, resetGameState, getDangerLevel, makeEssenceSpawn } from './game/state';
 import { GRID, GEM_TIERS } from './game/gems';
 import { spawnGem, getGemData } from './game/gemSpawner';
 import { initMergeSystem, processMerges } from './game/mergeSystem';
@@ -22,13 +22,14 @@ import { startProfiling, recordFrame, drawPerfOverlay } from './game/perfProfile
 import { autoDetectQuality, feedFrameTime, updateTransition, shouldRenderEffects } from './game/renderConfig';
 import { getBoardCache } from './game/boardCache';
 import { writeSave, readSave, clearSave } from './game/persistence';
-import { initShakeDetection, ensureMotionPermission, checkLevelUp, updateLevelShake, getShakeGravity, getShakePhase, getCurrentLevel, pointsToNextLevel, getLidProgress, resetLevelShake, setLevel, closeShopPhase, drawLevelOverlay, getShakeStateForSave, restoreShakeState } from './game/levelShake';
+import { initShakeDetection, ensureMotionPermission, checkLevelUp, updateLevelShake, getShakeGravity, getShakePhase, getCurrentLevel, pointsToNextLevel, getLidProgress, resetLevelShake, setLevel, closeShopPhase, drawLevelOverlay, getShakeStateForSave, restoreShakeState, getShakeCharges, startManualShake } from './game/levelShake';
+import { getUnlockOrder, resetAbilityRail, getAbilityRailSave, restoreAbilityRail } from './game/abilityRail';
 import type { ShakePhase } from './game/levelShake';
 import { initHaptics, hapticMerge, hapticExplosion, hapticTierSkip, hapticBlackhole, hapticPrestige } from './game/haptics';
 import { getGameMode, setGameMode, getPersistedMode } from './game/gameMode';
 import { isHomeOpen, openHome, closeHome, drawHome, handleHomeClick, updateHome, type HomeAction } from './game/homepage';
 import { isDropdownOpen, toggleDropdown, closeDropdown, updateDropdown, isClickInNav, isClickOnRestart, isClickOnBackdrop, handleAutoShakeToggle, handleFireModeToggle, handleHapticsToggle, drawDropdown } from './game/dropdown';
-import { getGold, addGold, goldForTier, spawnGoldText, spawnScoreText, spawnFloatingLabel, updateFloatingText, drawFloatingText, openShop, closeShop, clearShopForNextLevel, isShopOpen, buyItem, rerollShop, getShopClickIndex, isClickOnContinue, isClickOnReroll, drawShop, updateShop, resetShop, getShopSaveData, restoreShopData, getGoldEarnedThisRun, handleShopLockClick, consumeLastInterestPaid, getSkipThrowCharges, consumeSkipThrowCharge } from './game/shop';
+import { getGold, addGold, goldForTier, spawnGoldText, spawnScoreText, spawnFloatingLabel, updateFloatingText, drawFloatingText, openShop, closeShop, clearShopForNextLevel, isShopOpen, buyItem, rerollShop, getShopClickIndex, isClickOnContinue, isClickOnReroll, drawShop, updateShop, resetShop, getShopSaveData, restoreShopData, getGoldEarnedThisRun, handleShopLockClick, consumeLastInterestPaid, getSkipThrowCharges, consumeSkipThrowCharge, getEssenceCharges, consumeEssenceCharge } from './game/shop';
 import { setOnBlackhole, resetBlackholeTracker, updateBlackholes, drawActiveBlackholes } from './game/blackhole';
 import type { SaveData, GemSnapshot } from './game/persistence';
 import { drawPauseOverlay } from './game/renderer';
@@ -187,6 +188,7 @@ const launcher = createLauncherState();
 let fireCooldown = 0;
 /** Temporary top wall during shake phase (keeps gems in the well). */
 let shakeLid: import('planck').Body | null = null;
+let prevShakePhase: ShakePhase = 'playing';
 
 /** Accumulated time (seconds) that gems have continuously been above the top line. */
 let overflowTimer = 0;
@@ -223,6 +225,7 @@ function gatherSave(): SaveData {
     version: 1,
     gems,
     queue: state.gemQueue.map((g) => g.def.id),
+    queueEssence: state.gemQueue.map((g) => g.essence),
     score: scoring.score,
     highScore: scoring.highScore,
     comboCount: scoring.comboCount,
@@ -245,8 +248,11 @@ function gatherSave(): SaveData {
         shakePhaseTimer: s.phaseTimer,
         shakeCountdownNum: s.countdownNum,
         shakeScore: s.shakeScore,
+        shakeCharges: s.shakeCharges,
+        shakeManual: s.manualShake,
       };
     })(),
+    abilityRail: getAbilityRailSave(),
     ...getShopSaveData(),
   };
 }
@@ -264,11 +270,15 @@ function restoreFromSave(save: SaveData): void {
     setVelocity(body, g.vx, g.vy);
   }
 
-  // Restore queue
+  // Restore queue — parallel queueEssence array carries the wildcard flag
+  // across blur/refresh so banked essence slots survive.
   state.gemQueue.length = 0;
-  for (const tid of save.queue) {
+  for (let i = 0; i < save.queue.length; i++) {
+    const tid = save.queue[i];
     const def = GEM_TIERS[tid];
-    if (def) state.gemQueue.push({ def, heavy: false, bonus: false, blackhole: false, rainbow: false });
+    if (!def) continue;
+    const essence = !!(save.queueEssence && save.queueEssence[i]);
+    state.gemQueue.push({ def, heavy: false, bonus: false, blackhole: false, rainbow: false, essence });
   }
 
   // Restore scoring
@@ -301,10 +311,13 @@ function restoreFromSave(save: SaveData): void {
       phaseTimer: save.shakePhaseTimer ?? 0,
       countdownNum: save.shakeCountdownNum ?? 3,
       shakeScore: save.shakeScore ?? 0,
+      shakeCharges: (save as any).shakeCharges ?? 0,
+      manualShake: (save as any).shakeManual ?? false,
     });
   }
 
   restoreShopData(save as any);
+  restoreAbilityRail((save as any).abilityRail);
 }
 
 // Always open the homepage on load. The player chooses Continue (if a save
@@ -469,6 +482,7 @@ function restartGame(): void {
   // Reset level system
   resetLevelShake();
   resetShop();
+  resetAbilityRail();
   resetBlackholeTracker();
 }
 
@@ -501,16 +515,41 @@ function handleMenuClick(clientX: number, clientY: number): void {
   // the same tap from also triggering shop buys, dropdown toggles, etc.
   if (resumeCooldown > 0) return;
 
-  // Skip-throw redo button — active only when a charge is available and we're
-  // actively playing (no shop/interlude/game-over). Check before the fire
-  // input so a tap on the button doesn't also launch a gem.
-  if (!state.gameOver && !isShopOpen() && !isDropdownOpen() && getShakePhase() === 'playing' && getSkipThrowCharges() > 0) {
-    const sr = getSkipThrowButtonRect();
-    if (vp.x >= sr.x && vp.x <= sr.x + sr.w && vp.y >= sr.y && vp.y <= sr.y + sr.h) {
-      if (consumeSkipThrowCharge()) {
+  // Action pill rail — dispatch by which ability was tapped. Only active while
+  // playing (no shop/interlude/game-over). Runs before fire input so a tap on
+  // the rail doesn't also launch a gem.
+  if (!state.gameOver && !isShopOpen() && !isDropdownOpen() && getShakePhase() === 'playing') {
+    const hit = getPillHit(vp.x, vp.y, getUnlockOrder());
+    if (hit === 'skip_throw') {
+      if (getSkipThrowCharges() > 0 && consumeSkipThrowCharge()) {
         const discarded = consumeNextGem(state);
         triggerQueueShift(discarded.def);
         spawnFloatingLabel(launcher.launchX, launcher.launchY - 20, 'SKIPPED', '#67E8F9', 0.9, 14);
+      }
+      return;
+    }
+    if (hit === 'shake') {
+      // Tap is a user gesture — request accelerometer permission on iOS so the
+      // upcoming 1s shake window can use device motion if auto-shake is OFF.
+      ensureMotionPermission();
+      if (startManualShake()) {
+        spawnFloatingLabel(launcher.launchX, launcher.launchY - 20, 'SHAKE!', '#FB923C', 0.9, 14);
+      }
+      return;
+    }
+    if (hit === 'essence') {
+      // Replace the first non-essence slot in the queue with an essence token.
+      // Starts at the currently-loaded launcher gem and walks further into the
+      // preview on subsequent clicks so the player can pre-queue multiple.
+      if (getEssenceCharges() > 0) {
+        let targetIdx = -1;
+        for (let i = 0; i < state.gemQueue.length; i++) {
+          if (!state.gemQueue[i].essence) { targetIdx = i; break; }
+        }
+        if (targetIdx >= 0 && consumeEssenceCharge()) {
+          state.gemQueue[targetIdx] = makeEssenceSpawn();
+          spawnFloatingLabel(launcher.launchX, launcher.launchY - 20, 'ESSENCE', '#E5E7EB', 0.9, 14);
+        }
       }
       return;
     }
@@ -592,12 +631,9 @@ input.onFire = (aimX, aimY) => {
   if (getShakePhase() !== 'playing') return;
   if (isDropdownOpen()) return;
   if (!canFireInTutorial()) return;
-  // Suppress fire when the aim lands on the skip-throw redo button, so clicking
-  // the button doesn't both fire AND skip. Guard matches the render-side visibility.
-  if (getSkipThrowCharges() > 0) {
-    const sr = getSkipThrowButtonRect();
-    if (aimX >= sr.x && aimX <= sr.x + sr.w && aimY >= sr.y && aimY <= sr.y + sr.h) return;
-  }
+  // Suppress fire when the aim lands on any unlocked pill — clicking the pill
+  // shouldn't both fire AND trigger the ability.
+  if (getPillHit(aimX, aimY, getUnlockOrder()) !== null) return;
 
   const vel = getLaunchVelocity(launcher, aimX, aimY);
   if (!vel) return;
@@ -610,6 +646,7 @@ input.onFire = (aimX, aimY) => {
   const body = spawnGem(world, launcher.launchX, launcher.launchY, tierIndex, spawn.rainbow, spawn.heavy);
   if (spawn.bonus) { const d = getGemData(body); if (d) d.bonus = true; }
   if (spawn.blackhole) { const d = getGemData(body); if (d) d.blackhole = true; }
+  if (spawn.essence) { const d = getGemData(body); if (d) d.essence = true; }
   setVelocity(body, vel.vx, vel.vy);
   setAngularVelocity(body, (Math.random() - 0.5) * 0.15);
 
@@ -726,12 +763,15 @@ startLoop({
     if (getGameMode() === 'classic') checkLevelUp(scoring.score);
     const interludeBlocks = updateLevelShake(_dt);
 
-    // Seal the well during countdown + shake + settling
+    // Seal the well during countdown + shake + settling + resume. The lid
+    // stays physically sealed through the resume animation so gems can't
+    // escape while the visual lid is animating open. Destroyed only when we
+    // transition back to 'playing'.
     const phase = getShakePhase();
-    if ((phase === 'countdown' || phase === 'shaking' || phase === 'settling') && !shakeLid) {
+    if ((phase === 'countdown' || phase === 'shaking' || phase === 'settling' || phase === 'resume') && !shakeLid) {
       shakeLid = createStaticRect(world, CX + CW / 2, CY + WALL_T / 2, CW + WALL_T * 2, WALL_T, wallOpts);
     }
-    if (phase === 'resume' || phase === 'playing') {
+    if (phase === 'playing') {
       if (shakeLid) { world.destroyBody(shakeLid); shakeLid = null; }
     }
 
@@ -750,8 +790,10 @@ startLoop({
           f.setRestitution(0.6);
         }
       }
-    } else if (phase === 'settling') {
-      // Restore normal gravity + body properties after shake
+    } else if (phase === 'settling' || (prevShakePhase === 'shaking' && phase !== 'shaking')) {
+      // Restore normal gravity + body properties after shake. Runs during the
+      // legacy settle phase AND on the transition out of a manual shake (which
+      // skips settling and goes straight to 'playing').
       world.setGravity({ x: 0, y: 25 });
       for (const b of dynamicBodies(world)) {
         const d = getGemData(b);
@@ -765,6 +807,7 @@ startLoop({
         }
       }
     }
+    prevShakePhase = phase;
 
     // Open shop when phase is 'shop' — checked before the interludeBlocks
     // early-return so a restored save that loads directly into the shop phase
@@ -826,6 +869,7 @@ startLoop({
           state.gameOver = true;
           clearSave();
           resetShop(); // wipe all upgrades immediately — no lingering via blur/save
+          resetAbilityRail();
           isNewHighScore = saveHighScore(scoring);
           const result = recordScore(scoring);
           gameOverHistory = result.history;
@@ -858,7 +902,7 @@ startLoop({
     // HUD + danger zone are hidden behind the homepage so they don't leak
     // through the darkening overlay.
     if (!isHomeOpen()) {
-      drawNextGemPanel(ctx, state.gemQueue.slice(1));
+      drawNextGemPanel(ctx, state.gemQueue.slice(1), elapsedTime);
       drawScoreHUD(ctx, scoring, getCurrentLevel(), pointsToNextLevel(scoring.score, getCurrentLevel()), getGold());
 
       // Danger zone indicator at top of container
@@ -903,11 +947,16 @@ startLoop({
 
     // Launcher gem (on top of everything except overlays)
     if (!state.gameOver && !isHomeOpen()) {
-      drawLauncherGem(ctx, launcher.launchX, launcher.launchY, state.nextGem.def, elapsedTime, state.nextGem.heavy, state.nextGem.bonus, state.nextGem.blackhole);
+      drawLauncherGem(ctx, launcher.launchX, launcher.launchY, state.nextGem.def, elapsedTime, state.nextGem.heavy, state.nextGem.bonus, state.nextGem.blackhole, state.nextGem.essence);
       // Action pill rail — slot 0 is Skip Throw, slots 1–4 are locked placeholders.
       // Only while playing (hidden during shake/shop/interlude).
       if (getShakePhase() === 'playing') {
-        drawActionPillRail(ctx, getSkipThrowCharges(), elapsedTime);
+        const order = getUnlockOrder();
+        drawActionPillRail(ctx, [
+          { id: 'skip_throw', charges: getSkipThrowCharges() },
+          { id: 'shake', charges: getShakeCharges() },
+          { id: 'essence', charges: getEssenceCharges() },
+        ], order, elapsedTime);
       }
     }
 

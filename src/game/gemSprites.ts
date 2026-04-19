@@ -172,3 +172,16 @@ export function clearGemSpriteCache(): void {
   spriteCache.clear();
   rainbowCache.clear();
 }
+
+// ---------------------------------------------------------------------------
+// Essence sprite (special wildcard merge gem)
+// ---------------------------------------------------------------------------
+
+const essenceImg = new Image();
+essenceImg.src = `${import.meta.env.BASE_URL}items/essence.png`;
+
+/** Get the essence sprite, or null if still loading. */
+export function getEssenceSprite(): HTMLImageElement | null {
+  if (!essenceImg.complete || essenceImg.naturalWidth === 0) return null;
+  return essenceImg;
+}

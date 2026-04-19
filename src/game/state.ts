@@ -90,7 +90,7 @@ let rainbowDropChance = 0;
 export function getRainbowDropChance(): number { return rainbowDropChance; }
 export function setRainbowDropChance(v: number): void { rainbowDropChance = v; }
 
-export interface SpawnResult { def: GemDef; heavy: boolean; bonus: boolean; blackhole: boolean; rainbow: boolean; }
+export interface SpawnResult { def: GemDef; heavy: boolean; bonus: boolean; blackhole: boolean; rainbow: boolean; essence: boolean; }
 
 export function randomSpawnGem(): SpawnResult {
   const heavy = heavyChance > 0 && Math.random() < heavyChance;
@@ -99,9 +99,15 @@ export function randomSpawnGem(): SpawnResult {
   // Rainbow drop: independent of variant flags so a Rainbow Heavy is possible.
   const rainbow = rainbowDropChance > 0 && Math.random() < rainbowDropChance;
   if (garnetChance > 0 && Math.random() < garnetChance) {
-    return { def: GEM_TIERS[MAX_SPAWN_TIER + 1], heavy, bonus, blackhole, rainbow };
+    return { def: GEM_TIERS[MAX_SPAWN_TIER + 1], heavy, bonus, blackhole, rainbow, essence: false };
   }
-  return { def: GEM_TIERS[Math.floor(Math.random() * (MAX_SPAWN_TIER + 1))], heavy, bonus, blackhole, rainbow };
+  return { def: GEM_TIERS[Math.floor(Math.random() * (MAX_SPAWN_TIER + 1))], heavy, bonus, blackhole, rainbow, essence: false };
+}
+
+/** Build an essence SpawnResult. Essence always uses a tier-1 body but acts
+ *  as a wildcard merge token on contact (see mergeDetector). */
+export function makeEssenceSpawn(): SpawnResult {
+  return { def: GEM_TIERS[1], heavy: false, bonus: false, blackhole: false, rainbow: false, essence: true };
 }
 
 function fillQueue(queue: SpawnResult[]): void {

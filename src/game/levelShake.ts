@@ -7,6 +7,7 @@
 
 import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT, IS_PORTRAIT } from '../canvas';
 import { initShake, requestShakePermission, getShakeInfo, resetShakePeak } from './shakeDetector';
+import { unlockAbility } from './abilityRail';
 
 // ---------------------------------------------------------------------------
 // Level thresholds — each level costs 1.4x more than the last
@@ -38,10 +39,10 @@ export function pointsToNextLevel(score: number, level: number): number {
 
 export type ShakePhase =
   | 'playing'       // normal gameplay
-  | 'level_banner'  // "Level Complete!" banner (1.2s)
-  | 'countdown'     // "3... 2... 1..." (3s)
-  | 'shaking'       // shake phase (1s)
-  | 'settling'      // physics runs, gems settle after shake (2s)
+  | 'level_banner'  // "Level Complete!" banner (2.5s) — flows directly to shop
+  | 'countdown'     // "3... 2... 1..." (3s) — unused post-refactor, kept for save-restore compat
+  | 'shaking'       // shake phase (1s) — now player-triggered via the shake pill
+  | 'settling'      // physics runs, gems settle after shake — unused post-refactor, kept for compat
   | 'shop'          // shop modal (blocks until user closes)
   | 'resume';       // brief "Level X" flash (0.5s)
 
@@ -52,6 +53,12 @@ interface LevelState {
   countdownNum: number; // 3, 2, 1
   /** Accumulated device motion magnitude during shake (mobile). */
   shakeScore: number;
+  /** True when the current 'shaking' phase was triggered by the shake pill
+   *  (vs the auto interlude). Manual shakes skip 'settling' and return directly
+   *  to 'playing' so the player can keep firing. */
+  manualShake: boolean;
+  /** Banked shake charges earned from leveling up. Consumed by the rail pill. */
+  shakeCharges: number;
 }
 
 const ls: LevelState = {
@@ -60,6 +67,8 @@ const ls: LevelState = {
   phaseTimer: 0,
   countdownNum: 3,
   shakeScore: 0,
+  manualShake: false,
+  shakeCharges: 0,
 };
 
 const IS_MOBILE = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -117,15 +126,48 @@ export interface ShakeSave {
   phaseTimer: number;
   countdownNum: number;
   shakeScore: number;
+  shakeCharges?: number;
+  manualShake?: boolean;
 }
 export function getShakeStateForSave(): ShakeSave {
-  return { phase: ls.phase, phaseTimer: ls.phaseTimer, countdownNum: ls.countdownNum, shakeScore: ls.shakeScore };
+  return {
+    phase: ls.phase, phaseTimer: ls.phaseTimer,
+    countdownNum: ls.countdownNum, shakeScore: ls.shakeScore,
+    shakeCharges: ls.shakeCharges, manualShake: ls.manualShake,
+  };
 }
 export function restoreShakeState(s: ShakeSave): void {
   ls.phase = s.phase;
   ls.phaseTimer = s.phaseTimer;
   ls.countdownNum = s.countdownNum;
   ls.shakeScore = s.shakeScore;
+  ls.shakeCharges = s.shakeCharges ?? 0;
+  ls.manualShake = s.manualShake ?? false;
+  if (ls.shakeCharges > 0) unlockAbility('shake');
+}
+
+// -- Shake charge banking ----------------------------------------------------
+
+export function getShakeCharges(): number { return ls.shakeCharges; }
+
+/** Grant one shake charge (called on level-up). Unlocks the pill the first time. */
+export function grantShakeCharge(): void {
+  ls.shakeCharges += 1;
+  unlockAbility('shake');
+}
+
+/** Attempt to start a player-triggered shake. Runs the 3-2-1 countdown first,
+ *  then a 1s shake, then snaps back to gameplay with no post-shake settle. */
+export function startManualShake(): boolean {
+  if (ls.phase !== 'playing') return false;
+  if (ls.shakeCharges <= 0) return false;
+  ls.shakeCharges -= 1;
+  ls.phase = 'countdown';
+  ls.phaseTimer = 0;
+  ls.countdownNum = 3;
+  ls.shakeScore = 0;
+  ls.manualShake = true;
+  return true;
 }
 
 /** Returns 0→1 for how closed the lid is (0=open, 1=sealed). */
@@ -134,7 +176,7 @@ export function getLidProgress(): number {
     case 'countdown': return Math.min(1, ls.phaseTimer / 1.0); // seals during first second of countdown
     case 'shaking': return 1;
     case 'settling': return 1;
-    case 'resume': return Math.max(0, 1 - ls.phaseTimer / 0.3); // opens during resume
+    case 'resume': return Math.max(0, 1 - ls.phaseTimer / 1.0); // opens smoothly over the full 1s resume
     default: return 0;
   }
 }
@@ -146,6 +188,8 @@ export function checkLevelUp(score: number): boolean {
   if (score >= threshold) {
     ls.phase = 'level_banner';
     ls.phaseTimer = 0;
+    // Bank one shake charge — the player can use it any time via the rail pill.
+    grantShakeCharge();
     return true;
   }
   return false;
@@ -208,49 +252,61 @@ export function updateLevelShake(dt: number): boolean {
 
   switch (ls.phase) {
     case 'level_banner':
+      // Level up flows straight to the shop — no auto-shake interlude. The
+      // player banks a shake charge (granted on threshold hit) and spends it
+      // via the rail pill whenever they want.
       if (ls.phaseTimer >= 2.5) {
-        ls.phase = 'countdown';
+        ls.phase = 'shop';
         ls.phaseTimer = 0;
-        ls.countdownNum = 3;
-        ls.shakeScore = 0;
       }
-      return false; // physics keeps running so gems settle
+      return false; // physics keeps running while the banner plays
 
     case 'countdown':
+      // Legacy interlude — retained for save-restore compat. Old saves mid-countdown
+      // tick down normally; new flow skips this phase entirely.
       ls.countdownNum = 3 - Math.floor(ls.phaseTimer);
       if (ls.phaseTimer >= 3) {
         ls.phase = 'shaking';
         ls.phaseTimer = 0;
-        resetShakePeak(); // fresh peak readout per shake phase
+        resetShakePeak();
       }
       return true;
 
     case 'shaking':
       if (ls.phaseTimer >= 1.0) {
-        ls.phase = 'settling';
+        // Both manual and auto shakes route through 'resume' so the lid
+        // animates open smoothly. Manual keeps the manualShake flag set so
+        // 'resume' knows not to increment the level.
+        ls.phase = ls.manualShake ? 'resume' : 'settling';
         ls.phaseTimer = 0;
       }
       return false; // physics runs during shake!
 
     case 'settling':
-      // Let gems settle after shaking — physics runs, no level check
+      // Legacy post-auto-shake settle. New flow never enters this phase; kept
+      // for old saves mid-interlude.
       if (ls.phaseTimer >= 5.0) {
         ls.phase = 'shop';
         ls.phaseTimer = 0;
       }
-      return false; // physics runs during settle!
+      return false;
 
     case 'shop':
       // Blocked until shop is closed externally via closeShopPhase()
       return true;
 
-    case 'resume':
-      if (ls.phaseTimer >= 0.5) {
-        ls.level++;
+    case 'resume': {
+      // 1s resume for both manual and auto — the lid animates fully open while
+      // physics continues (so gems settle, not freeze). Firing stays blocked
+      // because the fire handler gates on phase === 'playing'.
+      if (ls.phaseTimer >= 1.0) {
+        if (!ls.manualShake) ls.level++;
+        ls.manualShake = false;
         ls.phase = 'playing';
         ls.phaseTimer = 0;
       }
-      return true;
+      return false;
+    }
   }
 
   return false;
@@ -263,6 +319,8 @@ export function resetLevelShake(): void {
   ls.phaseTimer = 0;
   ls.countdownNum = 3;
   ls.shakeScore = 0;
+  ls.manualShake = false;
+  ls.shakeCharges = 0;
 }
 
 /** Set the current level (used when restoring from save). */
@@ -472,7 +530,10 @@ export function drawLevelOverlay(ctx: CanvasRenderingContext2D, _time?: number):
     }
 
     case 'resume': {
-      const fadeAlpha = 1 - ls.phaseTimer / 0.3;
+      // Manual shake resume is just the lid-opening animation — no level flash.
+      if (ls.manualShake) break;
+      // Level text fades over the full 1s resume alongside the lid animation.
+      const fadeAlpha = Math.max(0, 1 - ls.phaseTimer / 1.0);
       ctx.globalAlpha = fadeAlpha;
       ctx.font = `bold ${IS_PORTRAIT ? 28 : 24}px monospace`;
       ctx.fillStyle = '#e8c44a';

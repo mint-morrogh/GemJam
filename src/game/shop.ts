@@ -4,6 +4,7 @@
 
 import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT, IS_PORTRAIT } from '../canvas';
 import { setGarnetChance, getGarnetChance, setHeavyChance, getHeavyChance, setBonusChance, getBonusChance, setTierSkipChance, getTierSkipChance, setBonusGemSpawnChance, getBonusGemSpawnChance, setBlackholeChance, getBlackholeChance, setExplosionChance, getExplosionChance, setRainbowDropChance, getRainbowDropChance } from './state';
+import { unlockAbility } from './abilityRail';
 
 // ---------------------------------------------------------------------------
 // Gold
@@ -226,6 +227,9 @@ let lockCapacity = 1;
 let lockOrderCounter = 0;
 /** Remaining "redo" charges — each consumed charge discards the current launcher gem. Persists across levels. */
 let skipThrowCharges = 0;
+/** Banked essence charges. Each consumed charge replaces the first non-essence
+ *  slot in the gem queue (starting with the currently-loaded launcher gem). */
+let essenceCharges = 0;
 
 export function getInterestRate(): number { return interestRate; }
 export function getDiscountRate(): number { return discountRate; }
@@ -235,6 +239,12 @@ export function getSkipThrowCharges(): number { return skipThrowCharges; }
 export function consumeSkipThrowCharge(): boolean {
   if (skipThrowCharges <= 0) return false;
   skipThrowCharges -= 1;
+  return true;
+}
+export function getEssenceCharges(): number { return essenceCharges; }
+export function consumeEssenceCharge(): boolean {
+  if (essenceCharges <= 0) return false;
+  essenceCharges -= 1;
   return true;
 }
 function getSlotCount(): number { return 6 + extraSlots; }
@@ -389,16 +399,34 @@ const ITEM_DEFS: ShopItemDef[] = [
     description: (pct) => `+${Math.round(pct)} redo charges to discard the current gem`,
     basePct: 1, // unused — rarityPct below overrides the default scaling
     baseCost: 180,
-    apply: (pct) => { skipThrowCharges += Math.round(pct); },
+    apply: (pct) => {
+      skipThrowCharges += Math.round(pct);
+      unlockAbility('skip_throw');
+    },
     // Cluster purchase — generous base + ~+3 per rarity step so banking a
     // stockpile is a viable strategy. No hard cap.
     rarityPct: { common: 4, uncommon: 7, rare: 10, epic: 13, legendary: 16 },
   },
   {
+    id: 'essence',
+    name: 'Essence',
+    nameColor: '#E5E7EB',
+    description: (pct) => `+${Math.round(pct)} essence charge${pct > 1 ? 's' : ''} — wildcard merge`,
+    basePct: 1, // unused — rarityPct below sets the per-rarity count
+    baseCost: 280, // just under black hole's 300 — priciest shop items
+    apply: (pct) => {
+      essenceCharges += Math.round(pct);
+      unlockAbility('essence');
+    },
+    // 1/2/3/4/5 charges by rarity. Legendary 5-charges at 5× cost mult is a
+    // massive power play; common 1 charge is a modest but always-usable tool.
+    rarityPct: { common: 1, uncommon: 2, rare: 3, epic: 4, legendary: 5 },
+  },
+  {
     id: 'rainbow_drop',
-    name: 'Rainbow Drop',
+    name: 'Prestige Gem',
     nameColor: '#F472B6',
-    description: (pct) => `+${pct.toFixed(2)}% chance launcher gem is rainbow`,
+    description: (pct) => `+${pct.toFixed(2)}% chance launcher gem is prestige`,
     basePct: 0.1,
     baseCost: 800, // wildly expensive — these spawn prestige gems
     apply: (pct) => setRainbowDropChance(Math.min(0.02, getRainbowDropChance() + pct / 100)),
@@ -602,6 +630,7 @@ export function resetShop(): void {
   lockOrderCounter = 0;
   lastInterestPaid = 0;
   skipThrowCharges = 0;
+  essenceCharges = 0;
   setRainbowDropChance(0);
 }
 
@@ -628,7 +657,8 @@ export function getActiveUpgrades(): { name: string; value: string }[] {
   if (extraSlots > 0) ups.push({ name: 'Extra Slots', value: `+${extraSlots}` });
   if (lockCapacity > 1) ups.push({ name: 'Lock Capacity', value: `${lockCapacity}` });
   if (skipThrowCharges > 0) ups.push({ name: 'Skip Throws', value: `${skipThrowCharges}` });
-  const rd = getRainbowDropChance(); if (rd > 0) ups.push({ name: 'Rainbow Drop', value: `${(rd * 100).toFixed(2)}%` });
+  if (essenceCharges > 0) ups.push({ name: 'Essence', value: `${essenceCharges}` });
+  const rd = getRainbowDropChance(); if (rd > 0) ups.push({ name: 'Prestige Gem', value: `${(rd * 100).toFixed(2)}%` });
   return ups;
 }
 
@@ -654,6 +684,7 @@ export function getShopSaveData(): Record<string, any> {
     lockCapacity,
     lockOrderCounter,
     skipThrowCharges,
+    essenceCharges,
     rainbowDropChance: getRainbowDropChance(),
     // Persist shop items so they survive blur/restore
     shopItemsSave: shopItems.map(it => ({
@@ -696,6 +727,9 @@ export function restoreShopData(data: Record<string, any>): void {
   if (data.lockCapacity != null) lockCapacity = data.lockCapacity;
   if (data.lockOrderCounter != null) lockOrderCounter = data.lockOrderCounter;
   if (data.skipThrowCharges != null) skipThrowCharges = data.skipThrowCharges;
+  if (skipThrowCharges > 0) unlockAbility('skip_throw');
+  if (data.essenceCharges != null) essenceCharges = data.essenceCharges;
+  if (essenceCharges > 0) unlockAbility('essence');
   if (data.rainbowDropChance != null) setRainbowDropChance(data.rainbowDropChance);
   // Restore shop items
   if (Array.isArray(data.shopItemsSave)) {

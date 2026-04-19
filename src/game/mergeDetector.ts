@@ -42,8 +42,14 @@ export function initMergeDetection(world: World): void {
     const dataB = getGemData(bB);
     if (!dataA || !dataB) return;
     if (bA.isStatic() || bB.isStatic()) return;
-    if (dataA.tier !== dataB.tier) return;
-    if (dataA.rainbow !== dataB.rainbow) return;
+
+    // Essence wildcard bypass — essence merges with ANY gem regardless of
+    // tier or rainbow status. Checked before the normal same-tier gate.
+    const isEssenceMerge = dataA.essence || dataB.essence;
+    if (!isEssenceMerge) {
+      if (dataA.tier !== dataB.tier) return;
+      if (dataA.rainbow !== dataB.rainbow) return;
+    }
 
     const idA = bodyId(bA);
     const idB = bodyId(bB);
@@ -53,7 +59,22 @@ export function initMergeDetection(world: World): void {
     let rainbow: boolean;
     let tierSkipped = false;
 
-    if (dataA.tier === MAX_TIER) {
+    if (isEssenceMerge) {
+      // Promote whichever gem is the "hit" target: if exactly one is essence,
+      // the other's tier is used; if both essence, pick the higher-tier essence
+      // (typically both are tier 1, so tier 2 is the result). Rainbow state
+      // carries from the hit gem. MAX_TIER hit triggers the prestige cycle.
+      const hit = dataA.essence && dataB.essence
+        ? (dataA.tier >= dataB.tier ? dataA : dataB)
+        : (dataA.essence ? dataB : dataA);
+      if (hit.tier === MAX_TIER) {
+        if (hit.rainbow) { nextTier = -1; rainbow = false; }
+        else { nextTier = 0; rainbow = true; }
+      } else {
+        nextTier = hit.tier + 1;
+        rainbow = hit.rainbow;
+      }
+    } else if (dataA.tier === MAX_TIER) {
       if (dataA.rainbow) {
         nextTier = -1;
         rainbow = false;

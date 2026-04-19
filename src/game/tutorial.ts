@@ -19,7 +19,7 @@ import {
   getAutoShakeBtnRect,
   getFireModeBtnRect,
 } from './dropdown';
-import { getNextGemsStripRect, getDangerLineRect, getNextLevelHudRect } from './renderer';
+import { getNextGemsStripRect, getDangerLineRect, getNextLevelHudRect, getPillRailRect } from './renderer';
 
 // ---------------------------------------------------------------------------
 // Beats
@@ -32,6 +32,7 @@ export type HighlightTarget =
   | 'next-gems'
   | 'danger-line'
   | 'next-level-hud'
+  | 'pill-rail'
   | null;
 
 interface MessageBeat {
@@ -85,20 +86,8 @@ const BEATS: Beat[] = [
   { kind: 'freeplay', shots: 2, highlight: 'next-gems' },
   { kind: 'message', text: `Combos earn you more gold and points.` },
   { kind: 'freeplay', shots: 2 },
-  { kind: 'message', text: `At the end of each level, you get to shake the gem well.` },
-  {
-    kind: 'action',
-    text: `You can shake with your phone's accelerometer or let the game shake for you. ${TAP} the nav.`,
-    highlight: 'nav',
-    await: 'nav-open',
-  },
-  {
-    kind: 'action',
-    text: `Toggle AUTO-SHAKE to flip between the two.`,
-    highlight: 'auto-shake-toggle',
-    await: 'autoshake-change',
-  },
-  { kind: 'freeplay', shots: 2 },
+  { kind: 'message', text: `Special abilities you unlock during your run appear here.`, highlight: 'pill-rail' },
+  { kind: 'freeplay', shots: 2, highlight: 'pill-rail' },
   { kind: 'message', text: `Bigger merges score more points. Each level has a point threshold before the shop.` },
   // Highlight the NEXT LVL readout in the top HUD for a few shots so the
   // player sees exactly where the threshold is tracked.
@@ -121,6 +110,8 @@ interface TutorialState {
   messageShowing: boolean;
   /** Shots fired since beat started (for freeplay beats). */
   shotsThisBeat: number;
+  /** Target shot count for the current freeplay beat — rolled in [5,10]. */
+  freeplayTarget: number;
   /** Snapshot values at the start of an action beat (for change detection). */
   startFireMode: string;
   startAutoShake: boolean;
@@ -135,6 +126,7 @@ const ts: TutorialState = {
   step: 0,
   messageShowing: false,
   shotsThisBeat: 0,
+  freeplayTarget: 0,
   startFireMode: 'multitap',
   startAutoShake: false,
   prevDropdownOpen: false,
@@ -215,6 +207,12 @@ function enterBeat(): void {
   if (!b) return;
   ts.shotsThisBeat = 0;
 
+  if (b.kind === 'freeplay') {
+    // Randomize shots-between-messages in [5,10] so the pacing feels organic
+    // instead of always the same couple of shots.
+    ts.freeplayTarget = 5 + Math.floor(Math.random() * 6);
+  }
+
   if (b.kind === 'message' || b.kind === 'action') {
     ts.messageShowing = true;
   } else {
@@ -268,7 +266,7 @@ export function notifyFired(): void {
   const b = currentBeat();
   if (!b || b.kind !== 'freeplay') return;
   ts.shotsThisBeat++;
-  if (ts.shotsThisBeat >= b.shots) {
+  if (ts.shotsThisBeat >= ts.freeplayTarget) {
     advance();
   }
 }
@@ -347,6 +345,9 @@ export function drawTutorialHighlights(ctx: CanvasRenderingContext2D): void {
   } else if (target === 'next-gems') {
     const r = getNextGemsStripRect();
     strokeGlow(ctx, r.x - 2, r.y - 2, r.w + 4, r.h + 4, a, 12);
+  } else if (target === 'pill-rail') {
+    const r = getPillRailRect();
+    strokeGlow(ctx, r.x - 3, r.y - 3, r.w + 6, r.h + 6, a, 12);
   } else if (target === 'next-level-hud') {
     const r = getNextLevelHudRect();
     strokeGlow(ctx, r.x, r.y, r.w, r.h, a, 10);

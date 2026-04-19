@@ -7,7 +7,7 @@ import { getGemData } from './gemSpawner';
 import { getDraggedGem } from './touchDrag';
 import { glowRadiusScale, shadowOffsetScale, glowAlphaScale, getQualityPreset } from './renderConfig';
 import { getSettings } from './settings';
-import { getGemSprite, getRainbowGemSprite } from './gemSprites';
+import { getGemSprite, getRainbowGemSprite, getEssenceSprite } from './gemSprites';
 import { getShimmers } from './particles';
 
 // ---------------------------------------------------------------------------
@@ -45,9 +45,11 @@ const TOP_NAV_H = 40;
 // ---------------------------------------------------------------------------
 // Action pill rail (top band — replaces the old wide next-gems strip)
 // ---------------------------------------------------------------------------
-// Reserved row of 5 slot-sized pills. Slot 0 is Skip Throw. Slots 1–4 are
-// locked placeholders for future unlockable mechanics — they render grayed
-// out by default so the player can see what's coming.
+// Reserved row of 5 slot-sized pills. Unlocked abilities fill slots left-to-right
+// in their unlock order (earliest unlock = slot 0). Remaining slots render as
+// locked padlocks so the player can see additional unlocks are possible.
+
+import type { AbilityId } from './abilityRail';
 
 const PILL_W = 54;
 const PILL_H = 30;
@@ -66,6 +68,34 @@ function getPillSlotRect(index: number): { x: number; y: number; w: number; h: n
     w: PILL_W,
     h: PILL_H,
   };
+}
+
+/** Full rail bounding box (for tutorial highlight). */
+export function getPillRailRect(): { x: number; y: number; w: number; h: number } {
+  const first = getPillSlotRect(0);
+  const last = getPillSlotRect(PILL_COUNT - 1);
+  return { x: first.x, y: first.y, w: last.x + last.w - first.x, h: first.h };
+}
+
+export interface AbilityPillState {
+  id: AbilityId;
+  charges: number;
+}
+
+/** Return the slot rect for an unlocked ability, or null if not in the rail. */
+export function getPillRectFor(id: AbilityId, order: AbilityId[]): { x: number; y: number; w: number; h: number } | null {
+  const idx = order.indexOf(id);
+  if (idx < 0) return null;
+  return getPillSlotRect(idx);
+}
+
+/** Hit-test the rail. Returns the ability id under (vx,vy), or null. */
+export function getPillHit(vx: number, vy: number, order: AbilityId[]): AbilityId | null {
+  for (let i = 0; i < order.length; i++) {
+    const r = getPillSlotRect(i);
+    if (vx >= r.x && vx <= r.x + r.w && vy >= r.y && vy <= r.y + r.h) return order[i];
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -167,6 +197,7 @@ export function drawLauncherGem(
   heavy = false,
   bonus = false,
   blackhole = false,
+  essence = false,
 ): void {
   const actualR = gemDef.radius;
   // Display at actual physics size — gems range from 14 to 22 for spawnable tiers
@@ -188,26 +219,31 @@ export function drawLauncherGem(
   ctx.stroke();
   ctx.restore();
 
-  // Gem sprite or circle fallback — drawn at display size
+  // Gem sprite or circle fallback — drawn at display size. Essence overrides
+  // the tier sprite with the essence orb + rainbow glitter overlay.
   ctx.save();
-  const sprite = getGemSprite(gemDef.id);
-  if (sprite) {
-    // Isolate the clip so it doesn't carry over to later draws in this function.
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(launchX, launchY, displayR, 0, Math.PI * 2);
-    ctx.clip();
-    const size = displayR * 2;
-    ctx.drawImage(sprite, launchX - displayR, launchY - displayR, size, size);
-    ctx.restore();
+  if (essence) {
+    drawEssenceGem(ctx, launchX, launchY, displayR, time);
   } else {
-    ctx.beginPath();
-    ctx.arc(launchX, launchY, displayR, 0, Math.PI * 2);
-    ctx.fillStyle = gemDef.color;
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    const sprite = getGemSprite(gemDef.id);
+    if (sprite) {
+      // Isolate the clip so it doesn't carry over to later draws in this function.
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(launchX, launchY, displayR, 0, Math.PI * 2);
+      ctx.clip();
+      const size = displayR * 2;
+      ctx.drawImage(sprite, launchX - displayR, launchY - displayR, size, size);
+      ctx.restore();
+    } else {
+      ctx.beginPath();
+      ctx.arc(launchX, launchY, displayR, 0, Math.PI * 2);
+      ctx.fillStyle = gemDef.color;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
   }
 
   // Heavy gem: just a dark overlay, no text
@@ -241,11 +277,12 @@ export function drawLauncherGem(
   // on the currently-loaded launcher gem.
   let specialWord: string | null = null;
   let labelColor = 'rgba(255, 255, 255, 0.75)';
-  if (heavy) { specialWord = 'Heavy'; labelColor = '#d9d9d9'; }
+  if (essence) { specialWord = 'Essence'; labelColor = '#E5E7EB'; }
+  else if (heavy) { specialWord = 'Heavy'; labelColor = '#d9d9d9'; }
   else if (blackhole) { specialWord = 'Black Hole'; labelColor = '#c084fc'; }
   else if (bonus) { specialWord = 'Bonus'; labelColor = '#FBBF24'; }
-  const baseLabel = `[Lvl ${gemDef.id}] ${capitalizeGemType(gemDef.type)}`;
-  const fullLabel = specialWord ? `${baseLabel} (${specialWord})` : baseLabel;
+  const baseLabel = essence ? `Essence` : `[Lvl ${gemDef.id}] ${capitalizeGemType(gemDef.type)}`;
+  const fullLabel = essence ? 'Essence (Wildcard)' : (specialWord ? `${baseLabel} (${specialWord})` : baseLabel);
   // Center the label within the mirror of the next-gems strip: the strip
   // occupies [launchX + 48, launchX + 240] on the right, so the label sits
   // centered at launchX - (48 + STRIP_W/2) = launchX - 144.
@@ -263,27 +300,30 @@ export function drawLauncherGem(
 }
 
 /**
- * Action pill rail — row of 5 slots in the top band. Slot 0 is Skip Throw
- * (active when charges > 0, grayed when idle). Slots 1–4 are locked
- * placeholders for future unlockable mechanics.
+ * Action pill rail — row of 5 slots in the top band. Unlocked abilities fill
+ * leftmost slots in unlock order; remaining slots render as locked placeholders.
  */
-export function getSkipThrowButtonRect(): { x: number; y: number; w: number; h: number } {
-  return getPillSlotRect(0);
-}
-
 export function drawActionPillRail(
   ctx: CanvasRenderingContext2D,
-  skipCharges: number,
+  abilities: AbilityPillState[],
+  order: AbilityId[],
   time: number,
 ): void {
-  // Slot 0 — Skip Throw
-  const r0 = getPillSlotRect(0);
-  if (skipCharges > 0) drawSkipPill(ctx, r0, skipCharges, time);
-  else drawLockedPill(ctx, r0);
+  const byId = new Map<AbilityId, AbilityPillState>();
+  for (const a of abilities) byId.set(a.id, a);
 
-  // Slots 1..N-1 — locked placeholders for future unlocks.
-  for (let i = 1; i < PILL_COUNT; i++) {
-    drawLockedPill(ctx, getPillSlotRect(i));
+  for (let i = 0; i < PILL_COUNT; i++) {
+    const r = getPillSlotRect(i);
+    const id = order[i];
+    if (!id) { drawLockedPill(ctx, r); continue; }
+    const state = byId.get(id) ?? { id, charges: 0 };
+    // When an unlocked ability has no charges, the slot reverts to a gray
+    // padlock — it opens back up automatically when charges are earned again.
+    if (state.charges <= 0) { drawLockedPill(ctx, r); continue; }
+    if (id === 'skip_throw') drawSkipPill(ctx, r, state.charges, time);
+    else if (id === 'shake') drawShakePill(ctx, r, state.charges, time);
+    else if (id === 'essence') drawEssencePill(ctx, r, state.charges, time);
+    else drawLockedPill(ctx, r);
   }
 }
 
@@ -308,17 +348,22 @@ function drawSkipPill(
   const cy = r.y + r.h / 2;
   ctx.save();
 
-  const pulse = 0.5 + 0.5 * Math.sin(time * 2.5);
+  const active = charges > 0;
+  const pulse = active ? 0.5 + 0.5 * Math.sin(time * 2.5) : 0;
+  const color = '#67E8F9';
+  const dimColor = 'rgba(103, 232, 249, 0.35)';
 
   pillPath(ctx, r);
-  ctx.fillStyle = 'rgba(20, 40, 50, 0.85)';
+  ctx.fillStyle = active ? 'rgba(20, 40, 50, 0.85)' : 'rgba(18, 22, 30, 0.65)';
   ctx.fill();
-  ctx.strokeStyle = `rgba(103, 232, 249, ${0.5 + pulse * 0.4})`;
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = active
+    ? `rgba(103, 232, 249, ${0.5 + pulse * 0.4})`
+    : 'rgba(103, 232, 249, 0.22)';
+  ctx.lineWidth = active ? 2 : 1.5;
   ctx.stroke();
 
   const dividerX = r.x + r.w * 0.55;
-  ctx.strokeStyle = 'rgba(103, 232, 249, 0.25)';
+  ctx.strokeStyle = active ? 'rgba(103, 232, 249, 0.25)' : 'rgba(103, 232, 249, 0.12)';
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(dividerX, r.y + 5);
@@ -329,8 +374,9 @@ function drawSkipPill(
   const glyphR = 8;
   const arcStart = Math.PI * 0.15;
   const arcEnd = Math.PI * 1.85;
-  ctx.strokeStyle = '#67E8F9';
-  ctx.fillStyle = '#67E8F9';
+  const glyphColor = active ? color : dimColor;
+  ctx.strokeStyle = glyphColor;
+  ctx.fillStyle = glyphColor;
   ctx.lineWidth = 2.2;
   ctx.lineCap = 'butt';
   ctx.beginPath();
@@ -352,7 +398,101 @@ function drawSkipPill(
   ctx.fill();
 
   const countCx = r.x + r.w * 0.775;
-  ctx.fillStyle = '#67E8F9';
+  ctx.fillStyle = glyphColor;
+  ctx.font = `bold 14px monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`${charges}`, countCx, cy + 0.5);
+
+  ctx.restore();
+}
+
+function drawShakePill(
+  ctx: CanvasRenderingContext2D,
+  r: { x: number; y: number; w: number; h: number },
+  charges: number,
+  time: number,
+): void {
+  const cy = r.y + r.h / 2;
+  ctx.save();
+
+  const active = charges > 0;
+  const pulse = active ? 0.5 + 0.5 * Math.sin(time * 2.5) : 0;
+  const color = '#FB923C';
+  const dimColor = 'rgba(251, 146, 60, 0.35)';
+
+  pillPath(ctx, r);
+  ctx.fillStyle = active ? 'rgba(40, 22, 10, 0.85)' : 'rgba(24, 20, 14, 0.65)';
+  ctx.fill();
+  ctx.strokeStyle = active
+    ? `rgba(251, 146, 60, ${0.5 + pulse * 0.4})`
+    : 'rgba(251, 146, 60, 0.22)';
+  ctx.lineWidth = active ? 2 : 1.5;
+  ctx.stroke();
+
+  const dividerX = r.x + r.w * 0.55;
+  ctx.strokeStyle = active ? 'rgba(251, 146, 60, 0.25)' : 'rgba(251, 146, 60, 0.12)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(dividerX, r.y + 5);
+  ctx.lineTo(dividerX, r.y + r.h - 5);
+  ctx.stroke();
+
+  // Shake glyph — a single ball bobbing up and down. Minimal is enough to read.
+  const glyphCx = r.x + r.w * 0.275;
+  const glyphColor = active ? color : dimColor;
+  ctx.fillStyle = glyphColor;
+
+  const bob = active ? Math.sin(time * 14) * 4 : 0;
+  ctx.beginPath();
+  ctx.arc(glyphCx, cy + bob, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  const countCx = r.x + r.w * 0.775;
+  ctx.fillStyle = glyphColor;
+  ctx.font = `bold 14px monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`${charges}`, countCx, cy + 0.5);
+
+  ctx.restore();
+}
+
+function drawEssencePill(
+  ctx: CanvasRenderingContext2D,
+  r: { x: number; y: number; w: number; h: number },
+  charges: number,
+  time: number,
+): void {
+  const cy = r.y + r.h / 2;
+  ctx.save();
+
+  // Hue-cycling border + count to signal "rainbow wildcard".
+  const hue = (time * 80) % 360;
+  const borderColor = `hsl(${hue}, 95%, 65%)`;
+  const dimBorder = 'rgba(229, 231, 235, 0.25)';
+
+  pillPath(ctx, r);
+  ctx.fillStyle = 'rgba(24, 26, 38, 0.85)';
+  ctx.fill();
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  const dividerX = r.x + r.w * 0.55;
+  ctx.strokeStyle = dimBorder;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(dividerX, r.y + 5);
+  ctx.lineTo(dividerX, r.y + r.h - 5);
+  ctx.stroke();
+
+  // Glyph: a small glass orb with rainbow sparkles — use the essence renderer.
+  const glyphCx = r.x + r.w * 0.275;
+  drawEssenceGem(ctx, glyphCx, cy, 8, time);
+
+  const countCx = r.x + r.w * 0.775;
+  ctx.fillStyle = borderColor;
   ctx.font = `bold 14px monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -557,7 +697,7 @@ function capitalizeGemType(type: string): string {
  * Borderless — gems float with arrow flow indicators. The tutorial draws its
  * own glow on top when highlighting this rect.
  */
-export function drawNextGemPanel(ctx: CanvasRenderingContext2D, queue: readonly { def: GemDef; heavy: boolean; bonus: boolean; blackhole: boolean }[]): void {
+export function drawNextGemPanel(ctx: CanvasRenderingContext2D, queue: readonly { def: GemDef; heavy: boolean; bonus: boolean; blackhole: boolean; essence?: boolean }[], time: number = 0): void {
   const sx = STRIP_X;
   const sy = STRIP_Y;
   const sw = STRIP_W;
@@ -605,7 +745,14 @@ export function drawNextGemPanel(ctx: CanvasRenderingContext2D, queue: readonly 
     const isNew = animating && i === GEM_SLOT_COUNT - 1;
     const baseAlpha = i === 0 ? 1 : 0.4 + 0.3 * (1 - i / GEM_SLOT_COUNT);
     const alpha = isNew ? baseAlpha * t : baseAlpha;
-    drawStripGem(ctx, item.def, slotX, centerY - 2, 1, alpha, i === 0);
+    // Essence overrides the base gem visual — draw the orb + glitter instead
+    // of the tier sprite so the player can see it coming in the queue.
+    if (item.essence) {
+      const visR = Math.min(item.def.radius, 20);
+      drawEssenceGem(ctx, slotX, centerY - 2, visR, time, 1, alpha);
+    } else {
+      drawStripGem(ctx, item.def, slotX, centerY - 2, 1, alpha, i === 0);
+    }
 
     // Blackhole gem: dark purple swirling aura in queue
     if (item.blackhole) {
@@ -1406,7 +1553,11 @@ export function drawPhysicsGems(ctx: CanvasRenderingContext2D, bodies: readonly 
     const pos = bodyPos(body);
     if (data.bonus) drawBonusAura(ctx, pos.x, pos.y, def.radius, time, 1);
     if (data.blackhole) drawBlackholeAura(ctx, pos.x, pos.y, def.radius, time);
-    drawSingleGem(ctx, pos.x, pos.y, def, 1, 1, data.tier, time, bodyAngle(body), data.rainbow, data.heavy);
+    if (data.essence) {
+      drawEssenceGem(ctx, pos.x, pos.y, def.radius, time);
+    } else {
+      drawSingleGem(ctx, pos.x, pos.y, def, 1, 1, data.tier, time, bodyAngle(body), data.rainbow, data.heavy);
+    }
   }
 
   // Draw dragged gem last (on top) with lift effect
@@ -1415,7 +1566,11 @@ export function drawPhysicsGems(ctx: CanvasRenderingContext2D, bodies: readonly 
     const def = GEM_TIERS[drag.tier];
     if (def) {
       const pos = bodyPos(drag.body);
-      drawSingleGem(ctx, pos.x, pos.y, def, DRAG_SCALE, DRAG_ALPHA, drag.tier, time, bodyAngle(drag.body), data?.rainbow ?? false, data?.heavy ?? false);
+      if (data?.essence) {
+        drawEssenceGem(ctx, pos.x, pos.y, def.radius, time, DRAG_SCALE, DRAG_ALPHA);
+      } else {
+        drawSingleGem(ctx, pos.x, pos.y, def, DRAG_SCALE, DRAG_ALPHA, drag.tier, time, bodyAngle(drag.body), data?.rainbow ?? false, data?.heavy ?? false);
+      }
     }
   }
 }
@@ -1593,6 +1748,67 @@ function drawBlackholeAura(ctx: CanvasRenderingContext2D, x: number, y: number, 
   ctx.beginPath();
   ctx.arc(x, y, auraR, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+}
+
+/** Draw the essence sprite (glass orb with spirit swirl) at the given position,
+ *  then overlay a handful of rainbow-cycling sparkles so it reads as magical.
+ *  Falls back to a plain circle if the image hasn't loaded yet. */
+function drawEssenceGem(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, time: number, scale: number = 1, alpha: number = 1): void {
+  const size = r * 2 * scale;
+  const sprite = getEssenceSprite();
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  if (sprite) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, r * scale, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(sprite, x - size / 2, y - size / 2, size, size);
+    ctx.restore();
+  } else {
+    ctx.beginPath();
+    ctx.arc(x, y, r * scale, 0, Math.PI * 2);
+    ctx.fillStyle = '#e5e7eb';
+    ctx.fill();
+  }
+  ctx.restore();
+  drawEssenceGlitter(ctx, x, y, r * scale, time, alpha);
+}
+
+/** Rainbow-cycling sparkles layered on top of an essence sprite. The sparkle
+ *  positions rotate around the gem and fade in/out so the gem looks alive. */
+function drawEssenceGlitter(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, time: number, alpha: number = 1): void {
+  const count = 7;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < count; i++) {
+    const phase = (i / count) * Math.PI * 2;
+    const angle = time * 1.2 + phase;
+    const orbit = r * (0.55 + 0.3 * Math.sin(time * 2.5 + phase * 2));
+    const sx = x + Math.cos(angle) * orbit;
+    const sy = y + Math.sin(angle) * orbit;
+    const twinkle = 0.5 + 0.5 * Math.sin(time * 5 + phase * 3);
+    const hue = ((time * 90) + (i * 360) / count) % 360;
+    const sz = (r * 0.08 + r * 0.06 * twinkle);
+    ctx.globalAlpha = alpha * (0.55 + 0.35 * twinkle);
+    ctx.fillStyle = `hsl(${hue}, 95%, 68%)`;
+    // 4-pointed sparkle
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - sz);
+    ctx.lineTo(sx + sz * 0.35, sy);
+    ctx.lineTo(sx, sy + sz);
+    ctx.lineTo(sx - sz * 0.35, sy);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(sx - sz, sy);
+    ctx.lineTo(sx, sy + sz * 0.35);
+    ctx.lineTo(sx + sz, sy);
+    ctx.lineTo(sx, sy - sz * 0.35);
+    ctx.closePath();
+    ctx.fill();
+  }
   ctx.restore();
 }
 

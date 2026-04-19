@@ -17,6 +17,9 @@ export interface GemData {
   bonus: boolean;
   /** Black hole gem — absorbs all same-tier gems on first contact. */
   blackhole: boolean;
+  /** Essence — wildcard merge token. Contacting ANY gem produces
+   *  (hit_tier + 1) at the midpoint, regardless of the essence's own tier. */
+  essence: boolean;
 }
 
 let nextGemId = 1;
@@ -45,7 +48,7 @@ export function spawnGem(
   const linearDamping = heavy ? 0.1 : (0.8 - t * 0.5);
   const angularDamping = 2.0 + t * 1.0;
 
-  const gemData: GemData = { gemId: nextGemId++, tier, rainbow, heavy, bonus: false, blackhole: false };
+  const gemData: GemData = { gemId: nextGemId++, tier, rainbow, heavy, bonus: false, blackhole: false, essence: false };
 
   return createCircle(world, x, y, def.radius, {
     density,
