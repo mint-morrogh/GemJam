@@ -206,14 +206,16 @@ export function drawLauncherGem(
   // Bonus gem: golden aura
   if (bonus) drawBonusAura(ctx, launchX, launchY, displayR, time, 1);
 
-  // Pulsing glow ring — gem-colored with soft outer bloom
+  // Pulsing glow ring — gem-colored with soft outer bloom. Essence cycles
+  // through the rainbow so the wildcard nature reads even before firing.
   const pulse = 0.5 + 0.5 * Math.sin(time * 3);
+  const ringColor = essence ? `hsl(${(time * 90) % 360}, 95%, 65%)` : gemDef.color;
   ctx.save();
-  ctx.shadowColor = gemDef.color;
+  ctx.shadowColor = ringColor;
   ctx.shadowBlur = 10 + pulse * 6;
   ctx.beginPath();
   ctx.arc(launchX, launchY, displayR + 6 + pulse * 3, 0, Math.PI * 2);
-  ctx.strokeStyle = gemDef.color;
+  ctx.strokeStyle = ringColor;
   ctx.globalAlpha = 0.5 + 0.3 * pulse;
   ctx.lineWidth = 2;
   ctx.stroke();
@@ -1776,8 +1778,9 @@ function drawEssenceGem(ctx: CanvasRenderingContext2D, x: number, y: number, r: 
   drawEssenceGlitter(ctx, x, y, r * scale, time, alpha);
 }
 
-/** Rainbow-cycling sparkles layered on top of an essence sprite. The sparkle
- *  positions rotate around the gem and fade in/out so the gem looks alive. */
+/** Sparkles layered on top of an essence sprite. Additive (`lighter`)
+ *  composite over the bright orb reads as white-gold glints, which fits the
+ *  "spirit in a glass" look better than flat colored dots. */
 function drawEssenceGlitter(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, time: number, alpha: number = 1): void {
   const count = 7;
   ctx.save();
